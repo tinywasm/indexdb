@@ -1,7 +1,8 @@
 package indexdb
 
 import (
-	"github.com/tinywasm/tinyreflect"
+	"reflect"
+
 	. "github.com/tinywasm/fmt"
 )
 
@@ -18,18 +19,18 @@ func (d *IndexDB) CreateTableIfNotExists(tableName string, structType any) error
 
 // createTable creates a table for the given struct type
 func (d *IndexDB) createTable(tableName string, structType any) error {
-	st := tinyreflect.TypeOf(structType)
+	st := reflect.TypeOf(structType)
 
-	if st.Kind() == K.Struct {
-		structTypeInfo := st.StructType()
+	if st.Kind() == reflect.Struct {
 
 		table_name := tableName
 
-		if len(structTypeInfo.Fields) != 0 {
+		if st.NumField() != 0 {
 			// Find primary key field
 			pk_name := ""
-			for _, f := range structTypeInfo.Fields {
-				fieldName := f.Name.String()
+			for i := 0; i < st.NumField(); i++ {
+				f := st.Field(i)
+				fieldName := f.Name
 				_, isPK := IDorPrimaryKey(table_name, fieldName)
 				if isPK {
 					if pk_name != "" {
@@ -46,8 +47,9 @@ func (d *IndexDB) createTable(tableName string, structType any) error {
 			newTable := d.db.Call("createObjectStore", table_name, map[string]interface{}{"keyPath": pk_name})
 
 			// Create indexes for all fields except primary key
-			for _, f := range structTypeInfo.Fields {
-				fieldName := f.Name.String()
+			for i := 0; i < st.NumField(); i++ {
+				f := st.Field(i)
+				fieldName := f.Name
 
 				// Skip primary key field (it's the keyPath)
 				_, unique := IDorPrimaryKey(table_name, fieldName)
