@@ -1,7 +1,8 @@
 package indexdb
 
 import (
-	"github.com/tinywasm/tinyreflect"
+	"reflect"
+
 	. "github.com/tinywasm/fmt"
 )
 
@@ -15,25 +16,27 @@ func (d *IndexDB) Delete(table_name string, items ...any) (err error) {
 
 	for _, item := range items {
 
-		v := tinyreflect.ValueOf(item)
+		v := reflect.ValueOf(item)
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
+		}
 
 		st := v.Type()
 
-		if st.Kind() == K.Struct {
-
-			structType := st.StructType()
+		if st.Kind() == reflect.Struct {
 
 			found := false
 
-			for j, f := range structType.Fields {
+			for j := 0; j < st.NumField(); j++ {
+				f := st.Field(j)
 
 				// Check if this is the primary key field
-				_, isPK := IDorPrimaryKey(table_name, f.Name.String())
+				_, isPK := IDorPrimaryKey(table_name, f.Name)
 				if isPK {
 
-					fieldValue, _ := v.Field(j)
+					fieldValue := v.Field(j)
 
-					id, _ := fieldValue.Interface()
+					id := fieldValue.Interface()
 
 					d.result = d.store.Call("delete", id)
 

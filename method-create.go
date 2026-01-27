@@ -3,7 +3,8 @@ package indexdb
 import (
 	"syscall/js"
 
-	"github.com/tinywasm/tinyreflect"
+	"reflect"
+
 	. "github.com/tinywasm/fmt"
 )
 
@@ -33,17 +34,15 @@ func (d *IndexDB) Create(table_name string, items ...any) (err error) {
 	pk_field := ""
 	pk_index := -1
 	if len(items) > 0 {
-		v := tinyreflect.ValueOf(items[0])
-		isPtr := v.Kind() == K.Pointer
-		if isPtr {
-			elem, _ := v.Elem()
-			v = elem
+		v := reflect.ValueOf(items[0])
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
 		}
 		st := v.Type()
-		if st.Kind() == K.Struct {
-			structType := st.StructType()
-			for i, f := range structType.Fields {
-				fieldName := f.Name.String()
+		if st.Kind() == reflect.Struct {
+			for i := 0; i < st.NumField(); i++ {
+				f := st.Field(i)
+				fieldName := f.Name
 				_, isPK := IDorPrimaryKey(table_name, fieldName)
 				if isPK {
 					if pk_field != "" {
@@ -61,31 +60,28 @@ func (d *IndexDB) Create(table_name string, items ...any) (err error) {
 
 	for i, item := range items {
 
-		v := tinyreflect.ValueOf(item)
-		isPtr := v.Kind() == K.Pointer
-		if isPtr {
-			elem, _ := v.Elem()
-			v = elem
+		v := reflect.ValueOf(item)
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
 		}
 
 		st := v.Type()
 
-		if st.Kind() == K.Struct {
+		if st.Kind() == reflect.Struct {
 
 			m := make(map[string]any)
 
-			structType := st.StructType()
+			for j := 0; j < st.NumField(); j++ {
+				f := st.Field(j)
 
-			for j, f := range structType.Fields {
+				fieldName := f.Name
 
-				fieldName := f.Name.String()
+				fieldValue := v.Field(j)
 
-				fieldValue, _ := v.Field(j)
-
-				val, _ := fieldValue.Interface()
+				val := fieldValue.Interface()
 
 				// Check if this is the primary key field
-				_, isPK := IDorPrimaryKey(table_name, f.Name.String())
+				_, isPK := IDorPrimaryKey(table_name, f.Name)
 				if isPK {
 
 					m[pk_field] = val
@@ -125,11 +121,10 @@ func (d *IndexDB) Create(table_name string, items ...any) (err error) {
 
 	// Set ID back to structs if they are pointers
 	for i, item := range items {
-		v := tinyreflect.ValueOf(item)
-		isPtr := v.Kind() == K.Pointer
-		if isPtr && pk_index >= 0 {
-			elem, _ := v.Elem()
-			fieldVal, _ := elem.Field(pk_index)
+		v := reflect.ValueOf(item)
+		if v.Kind() == reflect.Ptr && pk_index >= 0 {
+			elem := v.Elem()
+			fieldVal := elem.Field(pk_index)
 			fieldVal.SetString(d.data[i][pk_field].(string))
 		}
 	}

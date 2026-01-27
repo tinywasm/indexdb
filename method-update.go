@@ -1,7 +1,8 @@
 package indexdb
 
 import (
-	"github.com/tinywasm/tinyreflect"
+	"reflect"
+
 	. "github.com/tinywasm/fmt"
 )
 
@@ -23,17 +24,15 @@ func (d *IndexDB) Update(table_name string, items ...any) (err error) {
 	// Find primary key field
 	pk_field := ""
 	if len(items) > 0 {
-		v := tinyreflect.ValueOf(items[0])
-		isPtr := v.Kind() == K.Pointer
-		if isPtr {
-			elem, _ := v.Elem()
-			v = elem
+		v := reflect.ValueOf(items[0])
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
 		}
 		st := v.Type()
-		if st.Kind() == K.Struct {
-			structType := st.StructType()
-			for _, f := range structType.Fields {
-				fieldName := f.Name.String()
+		if st.Kind() == reflect.Struct {
+			for i := 0; i < st.NumField(); i++ {
+				f := st.Field(i)
+				fieldName := f.Name
 				_, isPK := IDorPrimaryKey(table_name, fieldName)
 				if isPK {
 					if pk_field != "" {
@@ -50,38 +49,35 @@ func (d *IndexDB) Update(table_name string, items ...any) (err error) {
 
 	for i, item := range items {
 
-		v := tinyreflect.ValueOf(item)
-		isPtr := v.Kind() == K.Pointer
-		if isPtr {
-			elem, _ := v.Elem()
-			v = elem
+		v := reflect.ValueOf(item)
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
 		}
 
 		st := v.Type()
 
-		if st.Kind() == K.Struct {
+		if st.Kind() == reflect.Struct {
 
 			m := make(map[string]interface{})
 
-			structType := st.StructType()
+			for j := 0; j < st.NumField(); j++ {
+				f := st.Field(j)
 
-			for j, f := range structType.Fields {
+				fieldName := f.Name
 
-				fieldName := f.Name.String()
-
-				tag := f.Tag().Get("db")
+				tag := f.Tag.Get("db")
 
 				// Use tag value as field name if present, otherwise use field name
 				if tag != "" {
 					fieldName = tag
 				}
 
-				fieldValue, _ := v.Field(j)
+				fieldValue := v.Field(j)
 
-				val, _ := fieldValue.Interface()
+				val := fieldValue.Interface()
 
 				// Check if this is the primary key field
-				_, isPK := IDorPrimaryKey(table_name, f.Name.String())
+				_, isPK := IDorPrimaryKey(table_name, f.Name)
 				if isPK {
 
 					m[pk_field] = val
