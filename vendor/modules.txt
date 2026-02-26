@@ -1,0 +1,6 @@
+# github.com/tinywasm/fmt v0.18.5
+## explicit; go 1.22
+github.com/tinywasm/fmt
+# github.com/tinywasm/orm v0.0.6
+## explicit; go 1.25.2
+github.com/tinywasm/orm
