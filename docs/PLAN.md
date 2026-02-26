@@ -1,29 +1,40 @@
-# IndexedDB Adapter - Phase 2 (Refinements)
+# IndexedDB Adapter - Phase 3 (Coverage & Documentation)
 
-This master prompt continues from the previous integration round, refining the API according to the latest domain requirements of the `tinywasm/orm` ecosystem.
+This master prompt outlines the execution plan to increase test coverage of the `tinywasm/indexdb` adapter to >90% and fully document its API for seamless AI/LLM consumption.
 
-## Development Rules
-- Constraints remain active: `gotest`, SRP, standard DI, pure stdlib testing, 500 lines limit, and flat hierarchy.
-- **WASM Restrictions:** No `database/sql`, no system calls. Strictly utilize `syscall/js`.
-- **Frontend Go Compatibility:** Use standard library replacements for tinygo compatibility. Use `tinywasm/fmt` instead of `fmt`/`strings`/`strconv`/`errors`; `tinywasm/time` instead of `time`; and `tinywasm/json` instead of `encoding/json`.
-- **Frontend Optimization:** **Avoid using `map`** declarations in WASM code to prevent binary bloat. Use structs or slices for small collections instead.
-- **Testing (`gotest`):** Run WASM tests automatically using `gotest` (do NOT use standard `go test`). The CLI command handles `-vet`, `-race`, and WASM tests automatically. 
-- **Mocking & Assertions:** Standard `testing` lib only. **NEVER** use external assertion libraries (e.g., `testify`, `gomega`).
+## Requirements & Constraints
+- **Testing Runner**: You MUST use the globally installed `gotest` CLI command. It automatically handles WASM tests, `-vet`, `-race`, and `-cover`. Simply execute `gotest` (no arguments) for the full suite, or `gotest -run TestName`. Do NOT use standard `go test`. If `gotest` is not installed, install it first using `go install github.com/tinywasm/devflow/cmd/gotest@latest`.
+- **Test Location & Tags**: All tests MUST be placed in the `tests/` directory. Since this is an IndexedDB adapter, all test files must include the `//go:build wasm` build tag at the top.
+- **Constraints**: 500 lines limit, flat hierarchy for logic, SRP for files. DO NOT use external assertion libraries. Use the standard `testing` library only.
+- **WASM Restrictions**: Strictly use `syscall/js`. No `database/sql` imports. Do not use maps on WASM, prefer slices and structs.
 
 ## Execution Steps
 
-### 1. Direct ORM Injection (`indexdb.go` / `adapter.go`)
-- The user expressed that having to manually wrap the adapter connection with `orm.New()` in the application code is tedious.
-- Refactor the primary constructor or initialization function (e.g., `InitDB` or `New`) to **directly return an `*orm.DB`**.
-- Example target signature: `func InitDB(dbName string, idg idGenerator, logger func(...any), structTables ...any) *orm.DB` (or an equivalent signature depending on your Phase 1 architectural decisions).
-- The internal logic of the constructor will naturally configure the `IndexDBAdapter` instance (connecting to IndexedDB), but before returning to the user, it MUST wrap it by calling `orm.New(adapter)`, returning the ready-to-use ORM `*DB` wrapper.
+### 1. Create API Documentation (`docs/IMPLEMENTATION.md`)
+- **Goal**: Document the finalized API so that any executing AI agent knows exactly how to consume the library.
+- **Action**: Read the source code to understand the implementation details, and then create a new documentation file `docs/IMPLEMENTATION.md` outlining the usage.
+- **Content Requirements**:
+  - Explain the `InitDB` constructor pattern, highlighting that it directly returns an `*orm.DB`.
+  - Provide a complete but concise usage snippet showing: 
+    1. A model struct implementing the ORM interfaces.
+    2. Initialization using `indexdb.InitDB`.
+    3. A brief chain of ORM operations (`Create`, `Query().Where().ReadOne()`, `Update`, `Delete`).
+  - Make sure to link this new documentation from `README.md` as an index.
 
-### 2. Directory & Test Hygiene (`vendor/`, `js_example/`, and `tests/`)
-- The repository incorrectly contains a `vendor/` folder. **DELETE IT completely.**
-- The repository incorrectly contains a `js_example/` folder. **DELETE IT completely.**
-- The repository incorrectly contains tests inside `wasm_tests/`. **MOVE all tests** to the standard `tests/` directory and ensure `wasm_tests/` is deleted.
-- All integration tests testing the IndexedDB logic inside `tests/` MUST include the `//go:build wasm` build tag at the very top of the file to comply with the Dual Testing Pattern.
+### 2. Refactor of Adapter Name and Visibility
+- **Goal**: Make the API idiomatic and easy to use. Internal elements should not be exported.
+- **Action**: 
+  - Rename `IndexDBAdapter` to an unexported `adapter` struct.
+  - Rename `NewAdapter` to `New`.
+  - Ensure all internal properties and methods not needed by the end user (e.g., `Initialize`) are unexported.
 
-### 3. Tests & Verification
-- Ensure all tests in `tests/` reflect the new constructor signature (they will receive `*orm.DB` directly from `indexdb.Init(...)` and therefore have immediate access to `db.Create()`, `db.Tx()`, etc.).
-- Validate implementation fully with `gotest`. The `gotest` CLI will automatically detect the WASM build tags and execute the tests in the headless browser environment seamlessly.
+### 3. Comprehensive Test Expansion (Coverage > 90%)
+- **Goal**: Escalate the current ~45% coverage to >90%.
+- **Action**: Add new or expand existing integration tests within the `tests/` folder. Create files per domain if they grow too large (e.g. `tests/crud_test.go`, `tests/schema_test.go`).
+- **Critical Paths to Cover**:
+  - Validations upon `InitDB` with invalid models (e.g., missing interface methods).
+  - Advanced CRUD edge cases (e.g., updating a non-existent ID, deleting a non-existent ID).
+  - Query constraints and conditions, specifically if IndexedDB ranges are used.
+  - Transactions logic (`db.Tx()`) handling and rollbacks if implemented.
+  - Verification of `TableExist` behaviors and the underlying ObjectStore index creation.
+- **Validation Check**: Run `gotest` repeatedly until the automated coverage report prints `✅ coverage: 9X.X%`.

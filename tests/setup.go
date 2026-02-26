@@ -1,3 +1,5 @@
+//go:build js && wasm
+
 package tests
 
 import (
@@ -19,19 +21,19 @@ func (t *idGenerator) GetNewID() string {
 
 // SetupDB creates a new IndexDB instance for testing
 // Now returns *orm.DB
-func SetupDB(logger func(...any), dbName ...string) (*orm.DB, *indexdb.IndexDBAdapter) {
+func SetupDB(logger func(...any), dbName string, structTables ...any) *orm.DB {
 	testDbName := "local_test_db"
-	if len(dbName) > 0 {
-		testDbName = dbName[0]
+	if dbName != "" {
+		testDbName = dbName
 	}
 
 	// Create a test ID generator
 	idGen := &idGenerator{}
 
-	adapter := indexdb.NewAdapter(testDbName, idGen, logger)
-	db := orm.New(adapter)
+	// Call the new primary constructor
+	db := indexdb.InitDB(testDbName, idGen, logger, structTables...)
 
-	return db, adapter
+	return db
 }
 
 // User represents a sample struct for testing table creation

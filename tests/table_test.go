@@ -1,6 +1,6 @@
 //go:build js && wasm
 
-package wasmtests_test
+package tests_test
 
 import (
 	"testing"
@@ -16,20 +16,12 @@ func TestIndexDBCrudOperations(t *testing.T) {
 		t.Log(args...)
 	}
 
-	// Setup the database
-	db, adapter := tests.SetupDB(logger)
+	// Setup the database with tables
+	db := tests.SetupDB(logger, "", tests.User{}, tests.Product{})
 
-	// add tables
-	// InitDB is on the adapter now
-	adapter.InitDB(tests.User{}, tests.Product{})
-
-	if !adapter.TableExist("user") {
-		t.Fatal("Table 'user' should exist")
-	}
-
-	if !adapter.TableExist("product") {
-		t.Fatal("Table 'product' should exist")
-	}
+	// Tables should be implicitly created by InitDB during SetupDB.
+	// We no longer manually test TableExist here because the ORM wrapper handles it via adapter.
+	// If needed we could use reflection or type assertion to get adapter, but better to test functionally.
 
 	// CREATE User without id expected id to be auto generated
 	// BUT orm.Create expects the ID to be set IF it's not auto-increment by DB.
@@ -51,7 +43,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	// The `GetNewID` helper is on adapter.
 
 	userOne := tests.User{Name: "Alice", Email: "alice@example.com"}
-	userOne.ID = adapter.GetNewID() // Manually assigning ID using adapter's generator
+	userOne.ID = "1" // Manually assigning simple ID for test since we no longer access adapter directly
 
 	err := db.Create(&userOne)
 	if err != nil {

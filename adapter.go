@@ -51,8 +51,15 @@ func NewAdapter(dbName string, idg idGenerator, logger func(...any)) *IndexDBAda
 	}
 }
 
-// InitDB initializes the IndexedDB database and creates object stores based on the provided structs.
-func (d *IndexDBAdapter) InitDB(structTables ...any) {
+// InitDB initializes the IndexedDB database and returns an *orm.DB instance.
+func InitDB(dbName string, idg idGenerator, logger func(...any), structTables ...any) *orm.DB {
+	adapter := NewAdapter(dbName, idg, logger)
+	adapter.Initialize(structTables...)
+	return orm.New(adapter)
+}
+
+// Initialize initializes the IndexedDB database and creates object stores based on the provided structs.
+func (d *IndexDBAdapter) Initialize(structTables ...any) {
 	d.tables = structTables
 
 	// Open connection to IndexedDB
