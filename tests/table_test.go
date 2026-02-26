@@ -1,6 +1,6 @@
 //go:build js && wasm
 
-package wasmtests_test
+package tests_test
 
 import (
 	"testing"
@@ -20,8 +20,8 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	db, adapter := tests.SetupDB(logger)
 
 	// add tables
-	// InitDB is on the adapter now
-	adapter.InitDB(tests.User{}, tests.Product{})
+	// Initialize is on the adapter now (renamed from InitDB)
+	adapter.Initialize(tests.User{}, tests.Product{})
 
 	if !adapter.TableExist("user") {
 		t.Fatal("Table 'user' should exist")

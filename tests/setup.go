@@ -29,6 +29,8 @@ func SetupDB(logger func(...any), dbName ...string) (*orm.DB, *indexdb.IndexDBAd
 	idGen := &idGenerator{}
 
 	adapter := indexdb.NewAdapter(testDbName, idGen, logger)
+	// Use NewAdapter + orm.New so we can return both the adapter (for lower-level test access)
+	// and the ORM wrapper (for general testing).
 	db := orm.New(adapter)
 
 	return db, adapter
