@@ -11,8 +11,8 @@ import (
 	"github.com/tinywasm/orm"
 )
 
-// Ensure IndexDBAdapter satisfies orm.Adapter
-var _ orm.Adapter = (*IndexDBAdapter)(nil)
+// Ensure adapter satisfies orm.Adapter
+var _ orm.Adapter = (*adapter)(nil)
 
 type idGenerator interface {
 	GetNewID() string
@@ -22,7 +22,7 @@ type structName interface {
 	StructName() string
 }
 
-type IndexDBAdapter struct {
+type adapter struct {
 	dbName string
 	db     js.Value
 	tables []any
@@ -34,15 +34,17 @@ type IndexDBAdapter struct {
 	initCompleted bool
 }
 
-// NewAdapter creates a new IndexDBAdapter.
-func NewAdapter(dbName string, idg idGenerator, logger func(...any)) *IndexDBAdapter {
+// New creates a new adapter instance.
+// It returns the internal adapter struct, which implements orm.Adapter.
+// Since the struct is unexported, this is primarily used by InitDB or advanced users who cast to orm.Adapter.
+func New(dbName string, idg idGenerator, logger func(...any)) orm.Adapter {
 	if logger == nil {
 		logger = func(args ...any) {
 			Println(args...)
 		}
 	}
 
-	return &IndexDBAdapter{
+	return &adapter{
 		dbName:   dbName,
 		db:       js.Value{},
 		idGen:    idg,
@@ -53,13 +55,13 @@ func NewAdapter(dbName string, idg idGenerator, logger func(...any)) *IndexDBAda
 
 // InitDB initializes the IndexedDB database and returns an *orm.DB instance.
 func InitDB(dbName string, idg idGenerator, logger func(...any), structTables ...any) *orm.DB {
-	adapter := NewAdapter(dbName, idg, logger)
-	adapter.Initialize(structTables...)
-	return orm.New(adapter)
+	a := New(dbName, idg, logger).(*adapter)
+	a.initialize(structTables...)
+	return orm.New(a)
 }
 
-// Initialize initializes the IndexedDB database and creates object stores based on the provided structs.
-func (d *IndexDBAdapter) Initialize(structTables ...any) {
+// initialize initializes the IndexedDB database and creates object stores based on the provided structs.
+func (d *adapter) initialize(structTables ...any) {
 	d.tables = structTables
 
 	// Open connection to IndexedDB
@@ -74,7 +76,7 @@ func (d *IndexDBAdapter) Initialize(structTables ...any) {
 	<-d.initDone
 }
 
-func (d *IndexDBAdapter) open(p *js.Value, message string) error {
+func (d *adapter) open(p *js.Value, message string) error {
 	d.db = p.Get("target").Get("result")
 
 	if !d.db.Truthy() {
@@ -83,7 +85,7 @@ func (d *IndexDBAdapter) open(p *js.Value, message string) error {
 	return nil
 }
 
-func (d *IndexDBAdapter) onUpgradeNeeded(this js.Value, p []js.Value) any {
+func (d *adapter) onUpgradeNeeded(this js.Value, p []js.Value) any {
 	// The event is fired on the request object, so 'this' is the request.
 	// p[0] is the event object.
 
@@ -128,12 +130,12 @@ func (d *IndexDBAdapter) onUpgradeNeeded(this js.Value, p []js.Value) any {
 	return nil
 }
 
-func (d *IndexDBAdapter) onShowDbError(this js.Value, p []js.Value) any {
+func (d *adapter) onShowDbError(this js.Value, p []js.Value) any {
 	d.logger("indexDB Error", p[0])
 	return nil
 }
 
-func (d *IndexDBAdapter) onOpenExistingDB(this js.Value, p []js.Value) any {
+func (d *adapter) onOpenExistingDB(this js.Value, p []js.Value) any {
 	err := d.open(&p[0], "OPEN")
 	if err != nil {
 		d.logger("open existing db error:", err)
@@ -149,8 +151,8 @@ func (d *IndexDBAdapter) onOpenExistingDB(this js.Value, p []js.Value) any {
 }
 
 // createTable creates a table for the given struct type.
-// Adapted from table.go but for IndexDBAdapter.
-func (d *IndexDBAdapter) createTable(tableName string, structType any) error {
+// Adapted from table.go but for adapter.
+func (d *adapter) createTable(tableName string, structType any) error {
 	st := reflect.TypeOf(structType)
 	if st.Kind() == reflect.Ptr {
 		st = st.Elem()
@@ -196,7 +198,7 @@ func (d *IndexDBAdapter) createTable(tableName string, structType any) error {
 }
 
 // TableExist checks if a table exists in the database
-func (d *IndexDBAdapter) TableExist(table_name string) bool {
+func (d *adapter) TableExist(table_name string) bool {
 	if !d.db.Truthy() {
 		return false
 	}
@@ -216,7 +218,7 @@ func (d *IndexDBAdapter) TableExist(table_name string) bool {
 }
 
 // Helper to access the ID generator
-func (d *IndexDBAdapter) GetNewID() string {
+func (d *adapter) GetNewID() string {
 	if d.idGen != nil {
 		return d.idGen.GetNewID()
 	}

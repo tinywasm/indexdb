@@ -10,7 +10,7 @@ import (
 )
 
 // Execute implements orm.Adapter for IndexDB.
-func (d *IndexDBAdapter) Execute(q orm.Query, m orm.Model, factory func() orm.Model, each func(orm.Model)) error {
+func (d *adapter) Execute(q orm.Query, m orm.Model, factory func() orm.Model, each func(orm.Model)) error {
 	switch q.Action {
 	case orm.ActionCreate:
 		return d.create(q, m)
@@ -27,7 +27,7 @@ func (d *IndexDBAdapter) Execute(q orm.Query, m orm.Model, factory func() orm.Mo
 	}
 }
 
-func (d *IndexDBAdapter) create(q orm.Query, m orm.Model) error {
+func (d *adapter) create(q orm.Query, m orm.Model) error {
 	// Establish a "readwrite" transaction block directed at the store mapped via q.Table.
 	store, err := d.getStore(q.Table, "readwrite")
 	if err != nil {
@@ -46,7 +46,7 @@ func (d *IndexDBAdapter) create(q orm.Query, m orm.Model) error {
 	return err
 }
 
-func (d *IndexDBAdapter) update(q orm.Query, m orm.Model) error {
+func (d *adapter) update(q orm.Query, m orm.Model) error {
 	// Establish a "readwrite" transaction block directed at the store mapped via q.Table.
 	store, err := d.getStore(q.Table, "readwrite")
 	if err != nil {
@@ -65,7 +65,7 @@ func (d *IndexDBAdapter) update(q orm.Query, m orm.Model) error {
 	return err
 }
 
-func (d *IndexDBAdapter) delete(q orm.Query, m orm.Model) error {
+func (d *adapter) delete(q orm.Query, m orm.Model) error {
 	// Establish a "readwrite" transaction block
 	store, err := d.getStore(q.Table, "readwrite")
 	if err != nil {
@@ -173,7 +173,7 @@ func (d *IndexDBAdapter) delete(q orm.Query, m orm.Model) error {
 	return Err("Complex delete with conditions not fully implemented yet, only single PK delete supported via conditions")
 }
 
-func (d *IndexDBAdapter) readOne(q orm.Query, m orm.Model) error {
+func (d *adapter) readOne(q orm.Query, m orm.Model) error {
 	store, err := d.getStore(q.Table, "readonly")
 	if err != nil {
 		return err
@@ -232,7 +232,7 @@ func (d *IndexDBAdapter) readOne(q orm.Query, m orm.Model) error {
 	return nil
 }
 
-func (d *IndexDBAdapter) readAll(q orm.Query, factory func() orm.Model, each func(orm.Model)) error {
+func (d *adapter) readAll(q orm.Query, factory func() orm.Model, each func(orm.Model)) error {
 	store, err := d.getStore(q.Table, "readonly")
 	if err != nil {
 		return err

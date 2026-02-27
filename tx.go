@@ -103,7 +103,7 @@ func processCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error
 
 // Transaction helper to start a transaction and get the object store.
 // mode should be "readonly" or "readwrite".
-func (d *IndexDBAdapter) getStore(tableName string, mode string) (js.Value, error) {
+func (d *adapter) getStore(tableName string, mode string) (js.Value, error) {
 	if !d.db.Truthy() {
 		return js.Value{}, Err("Database not initialized")
 	}
@@ -120,8 +120,21 @@ func (d *IndexDBAdapter) getStore(tableName string, mode string) (js.Value, erro
 
 	// A safer way would be to wrap in a recover block if we suspect invalid table names.
 	// For now, we assume ORM passes valid table names.
+	var tx js.Value
+	var err error
 
-	tx := d.db.Call("transaction", tableName, mode)
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				err = Errf("Failed to create transaction for table %s: %v", tableName, r)
+			}
+		}()
+		tx = d.db.Call("transaction", tableName, mode)
+	}()
+
+	if err != nil {
+		return js.Value{}, err
+	}
 
 	if !tx.Truthy() {
 		return js.Value{}, Errf("Failed to create transaction for table %s", tableName)

@@ -1,2 +1,7 @@
-indexdb.code-workspace
-.env
+node_modules/
+indexdb.test
+*.wasm
+wasm_exec.js
+runner.js
+package-lock.json
+package.json
