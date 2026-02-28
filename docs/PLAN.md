@@ -1,40 +1,34 @@
-# IndexedDB Adapter - Phase 3 (Coverage & Documentation)
+# Implementation Plan: Upgrade IndexDB Adapter API
 
-This master prompt outlines the execution plan to increase test coverage of the `tinywasm/indexdb` adapter to >90% and fully document its API for seamless AI/LLM consumption.
+## Development Rules
+- **WASM Environment (`tinywasm`):** Frontend Go Compatibility requires standard library replacements (`tinywasm/fmt`).
+- **Single Responsibility Principle (SRP):** Every file must have a single, well-defined purpose.
+- **Mandatory Dependency Injection (DI):** No global state. Interfaces for external dependencies.
+- **Testing Runner (`gotest`):** ALWAYS use the globally installed `gotest` CLI command. (If missing, run: `go install github.com/tinywasm/devflow/cmd/gotest@latest`).
+- **Standard Library Only in Tests:** NEVER use external assertion libraries.
+- **Documentation First:** Update docs before coding.
 
-## Requirements & Constraints
-- **Testing Runner**: You MUST use the globally installed `gotest` CLI command. It automatically handles WASM tests, `-vet`, `-race`, and `-cover`. Simply execute `gotest` (no arguments) for the full suite, or `gotest -run TestName`. Do NOT use standard `go test`. If `gotest` is not installed, install it first using `go install github.com/tinywasm/devflow/cmd/gotest@latest`.
-- **Test Location & Tags**: All tests MUST be placed in the `tests/` directory. Since this is an IndexedDB adapter, all test files must include the `//go:build wasm` build tag at the top.
-- **Constraints**: 500 lines limit, flat hierarchy for logic, SRP for files. DO NOT use external assertion libraries. Use the standard `testing` library only.
-- **WASM Restrictions**: Strictly use `syscall/js`. No `database/sql` imports. Do not use maps on WASM, prefer slices and structs.
+## Goal
+Refactor the `tinywasm/indexdb` adapter so that its initialization function directly returns a fully instantiated `*orm.DB` instance from `github.com/tinywasm/orm`. This eliminates the need for the user to write two lines of code to boot the database. Furthermore, add complex queries (including JOINs, or cross-store analogous logic) to the test suite, ensure coverage is >90%, and update all documentation.
 
 ## Execution Steps
 
-### 1. Create API Documentation (`docs/IMPLEMENTATION.md`)
-- **Goal**: Document the finalized API so that any executing AI agent knows exactly how to consume the library.
-- **Action**: Read the source code to understand the implementation details, and then create a new documentation file `docs/IMPLEMENTATION.md` outlining the usage.
-- **Content Requirements**:
-  - Explain the `InitDB` constructor pattern, highlighting that it directly returns an `*orm.DB`.
-  - Provide a complete but concise usage snippet showing: 
-    1. A model struct implementing the ORM interfaces.
-    2. Initialization using `indexdb.InitDB`.
-    3. A brief chain of ORM operations (`Create`, `Query().Where().ReadOne()`, `Update`, `Delete`).
-  - Make sure to link this new documentation from `README.md` as an index.
+### 1. Update Public API
+- Modify the adapter initialization signature in `adapter.go`.
+- Internally instantiate the IndexDB Executor and Compiler.
+- Pass them to `orm.New()` and return the resulting `*orm.DB`.
+- Ensure backwards compatibility is broken cleanly if necessary.
 
-### 2. Refactor of Adapter Name and Visibility
-- **Goal**: Make the API idiomatic and easy to use. Internal elements should not be exported.
-- **Action**: 
-  - Rename `IndexDBAdapter` to an unexported `adapter` struct.
-  - Rename `NewAdapter` to `New`.
-  - Ensure all internal properties and methods not needed by the end user (e.g., `Initialize`) are unexported.
+### 2. Complex Queries & JOINs Tests
+- Add comprehensive tests in the `tests/` directory utilizing the `tinywasm/orm` Fluent API.
+- Since IndexedDB is NoSQL, define how `JOIN` logic or complex criteria are formulated and resolved by the compiler.
+- Assert that the complex conditions accurately fetch the desired object store records.
 
-### 3. Comprehensive Test Expansion (Coverage > 90%)
-- **Goal**: Escalate the current ~45% coverage to >90%.
-- **Action**: Add new or expand existing integration tests within the `tests/` folder. Create files per domain if they grow too large (e.g. `tests/crud_test.go`, `tests/schema_test.go`).
-- **Critical Paths to Cover**:
-  - Validations upon `InitDB` with invalid models (e.g., missing interface methods).
-  - Advanced CRUD edge cases (e.g., updating a non-existent ID, deleting a non-existent ID).
-  - Query constraints and conditions, specifically if IndexedDB ranges are used.
-  - Transactions logic (`db.Tx()`) handling and rollbacks if implemented.
-  - Verification of `TableExist` behaviors and the underlying ObjectStore index creation.
-- **Validation Check**: Run `gotest` repeatedly until the automated coverage report prints `✅ coverage: 9X.X%`.
+### 3. Coverage > 90%
+- Run `gotest`.
+- Identify uncovered lines in `execute.go`, `adapter.go`, and `tx.go`.
+- Add mock or browser-based integration tests specifically targeting error paths and edge cases until the coverage is strictly greater than 90%.
+
+### 4. Update Documentation
+- **CRITICAL:** The `README.md` must be updated to show the new single-line initialization returning `*orm.DB`.
+- Update architecture or skill docs if the change affects the public contract.
