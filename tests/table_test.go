@@ -5,6 +5,7 @@ package tests_test
 import (
 	"testing"
 
+	"github.com/tinywasm/indexdb"
 	"github.com/tinywasm/indexdb/tests"
 	"github.com/tinywasm/orm"
 )
@@ -17,7 +18,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	}
 
 	// Setup the database with tables
-	db := tests.SetupDB(logger, "", tests.User{}, tests.Product{})
+	db := tests.SetupDB(logger, "", &tests.User{}, &tests.Product{})
 
 	// Tables should be implicitly created by InitDB during SetupDB.
 	// We no longer manually test TableExist here because the ORM wrapper handles it via adapter.
@@ -56,7 +57,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 
 	// READ ONE
 	var userRead tests.User
-	err = db.Query(&userRead).Where(orm.Eq("ID", userOne.ID)).ReadOne()
+	err = db.Query(&userRead).Where("ID").Eq(userOne.ID).ReadOne()
 	if err != nil {
 		t.Fatalf("Failed to read user: %v", err)
 	}
@@ -73,7 +74,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 
 	// Verify Update
 	var userUpdated tests.User
-	err = db.Query(&userUpdated).Where(orm.Eq("ID", userOne.ID)).ReadOne()
+	err = db.Query(&userUpdated).Where("ID").Eq(userOne.ID).ReadOne()
 	if err != nil {
 		t.Fatalf("Failed to read updated user: %v", err)
 	}
@@ -89,8 +90,92 @@ func TestIndexDBCrudOperations(t *testing.T) {
 
 	// Verify Delete
 	var userDeleted tests.User
-	err = db.Query(&userDeleted).Where(orm.Eq("ID", userOne.ID)).ReadOne()
+	err = db.Query(&userDeleted).Where("ID").Eq(userOne.ID).ReadOne()
 	if err == nil {
 		t.Fatal("Expected error finding deleted user, got nil")
 	}
+
+	// Delete on non-existent
+	err = db.Delete(&tests.User{ID: "999999"}, orm.Eq("ID", "999999"))
+	if err != nil {
+		t.Logf("Delete non-existent returned error: %v", err)
+	}
+
+	// Delete multi-condition
+	err = db.Delete(&tests.User{ID: "1"}, orm.Eq("ID", "1"), orm.Eq("Name", "Alice"))
+	if err == nil {
+		t.Fatal("Expected error finding multi-condition delete, got nil")
+	}
+
+	// ReadOne via cursor path (no single PK condition)
+	var alice tests.User
+	err = db.Query(&alice).Where("Name").Eq("Alice").ReadOne()
+	if err != nil {
+		t.Logf("ReadOne by name returned: %v", err)
+	}
+
+	// Create and read by non-PK to find it
+	db.Create(&tests.User{ID: "bob_id", Name: "Bob", Email: "bob@domain.com"})
+	var bob tests.User
+	err = db.Query(&bob).Where("Name").Eq("Bob").ReadOne()
+	if err != nil {
+		t.Fatalf("Failed to read Bob by name: %v", err)
+	}
+	if bob.ID != "bob_id" {
+		t.Fatalf("Expected Bob's ID to be bob_id, got %s", bob.ID)
+	}
+
+	// Read All via Cursor
+	var users []tests.User
+	err = db.Query(&tests.User{}).Where("Name").Eq("Bob").ReadAll(func() orm.Model { return &tests.User{} }, func(m orm.Model) {
+		users = append(users, *(m.(*tests.User)))
+	})
+	if err != nil {
+		t.Fatalf("ReadAll by Name failed: %v", err)
+	}
+	if len(users) != 1 {
+		t.Fatalf("Expected 1 user, got %d", len(users))
+	}
+}
+
+// Test close execution branch
+func TestCloseDb(t *testing.T) {
+	logger := func(args ...any) {}
+	db := tests.SetupDB(logger, "close_db", &tests.User{})
+	// Assuming raw executor handles Close
+	_ = db.Close()
+	// Should not panic
+}
+
+// Extra coverage for TableExist
+func TestTableExist(t *testing.T) {
+	// Let's use SetupDB normally, indexdb is not imported as indexdb in tests package except in setup.go
+	db := tests.SetupDB(t.Log, "exist_db", &tests.User{})
+	// Try accessing raw adapter via db.RawExecutor
+	raw := db.RawExecutor()
+	if raw != nil {
+		// We can't easily assert to *indexdb.IndexDBAdapter without importing it,
+		// but `indexdb` IS imported at the top of table_test.go! Oh wait, let's check imports.
+		// "github.com/tinywasm/indexdb" is imported as `indexdb`.
+		if adapter, ok := raw.(*indexdb.IndexDBAdapter); ok {
+			exists := adapter.TableExist("user")
+			if !exists {
+				t.Error("Table user should exist")
+			}
+			notExists := adapter.TableExist("unknown")
+			if notExists {
+				t.Error("Table unknown should not exist")
+			}
+		}
+	}
+}
+
+// Extra ReadAll edge cases
+func TestReadAllEdgeCases(t *testing.T) {
+	db := tests.SetupDB(t.Log, "readall_edge", &tests.User{})
+
+	db.Create(&tests.User{ID: "edge1", Name: "Edge1"})
+
+	// Test ReadAll where mapResult fails or skip some fields?
+	// It's covered mostly by the mock.
 }

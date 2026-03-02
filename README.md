@@ -4,5 +4,12 @@
 <!-- END_SECTION:BADGES_SECTION -->
 implementación de index dB con Websassembly compilado con go (golang) 
 
+## Usage
+
+```go
+db := indexdb.InitDB("my_db", idGenerator, logger, &User{}, &Product{})
+```
+This single-line initialization instantly yields a fully functioning `*orm.DB` ready for use with the `github.com/tinywasm/orm` API.
+
 ## [Contributing](https://github.com/tinywasm/cdvelop/blob/main/CONTRIBUTING.md)
 
