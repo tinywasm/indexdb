@@ -66,111 +66,19 @@ func (d *IndexDBAdapter) update(q orm.Query, m orm.Model) error {
 }
 
 func (d *IndexDBAdapter) delete(q orm.Query, m orm.Model) error {
-	// Establish a "readwrite" transaction block
 	store, err := d.getStore(q.Table, "readwrite")
 	if err != nil {
 		return err
 	}
 
-	// If we have a single equality condition on a key path, we can delete directly.
-	// But IndexedDB delete takes a key or a KeyRange.
-	// We need to determine the key.
-	// For now, we assume simple delete by PK if possible, or we iterate and delete.
-	// However, `store.delete` expects a key.
-
-	// Extract primary key value if present in conditions
-	// This is a simplification. A robust adapter would parse conditions more deeply.
-	// If q.Conditions has a PK condition, we use it.
-
-	// Assuming the first condition is the PK match for now (common in simple ORMs)
-	// or we need to find the PK from the model definition if available?
-	// The plan says: "If q.Conditions contains PK, use store.delete(pk)."
-
-	var pkValue any
-	// Iterate conditions to find PK. We don't know which field is PK here easily without Model metadata,
-	// but usually `orm` passes conditions.
-	// Let's look for "id" or similar, or just take the condition value if it's an equality check.
-
-	// Better approach: If there's 1 condition and it's '=', use it as the key.
 	if len(q.Conditions) == 1 && q.Conditions[0].Operator() == "=" {
-		pkValue = q.Conditions[0].Value()
+		pkValue := q.Conditions[0].Value()
 		req := store.Call("delete", pkValue)
 		_, err = processRequest(req)
 		return err
 	}
 
-	// If complex conditions, we might need to use a cursor to find keys to delete.
-	// This is more complex and might require multiple transactions or a cursor update.
-	// IndexedDB cursor.delete() can delete the record at the cursor position.
-
-	// Create a cursor to find records matching conditions
-	// However, we need to open the cursor, iterate, check conditions, and call cursor.delete().
-
-	req := store.Call("openCursor")
-
-	done := make(chan struct{})
-	// Removed unused loopErr
-
-	successFunc := js.FuncOf(func(this js.Value, args []js.Value) any {
-		cursor := req.Get("result")
-		if !cursor.Truthy() {
-			close(done)
-			return nil
-		}
-
-		// Get current value to check conditions
-		val := cursor.Get("value")
-
-		// Check conditions in Go
-		match := true
-		for _, cond := range q.Conditions {
-			fieldVal := val.Get(cond.Field())
-			if !checkCondition(fieldVal, cond) {
-				match = false
-				break
-			}
-		}
-
-		if match {
-			// Delete at cursor
-			delReq := cursor.Call("delete")
-			// We handle delete request success/error?
-			// Usually it's async too. But we are inside a success callback of the cursor.
-			// We can attach a success handler to the delete request, but we also need to continue the cursor.
-			// The cursor continue should probably happen after delete success?
-			// Or we can fire and forget if we trust it works in the same tx?
-			// Let's try to wait for delete? No, that blocks the event loop potentially?
-			// The standard way is to request delete, and on its success, continue cursor.
-
-			dSuccess := js.FuncOf(func(this js.Value, args []js.Value) any {
-				cursor.Call("continue")
-				return nil
-			})
-			// We need to manage lifecycle of this callback...
-			// To simplify, let's just assume delete works and call continue.
-			// (This is risky but standard specific implementation details are tricky here without more elaborate promise chaining).
-
-			// Actually, let's just call continue immediately. The transaction ensures consistency.
-			delReq.Call("addEventListener", "success", dSuccess)
-
-			// We'll leak dSuccess if we don't clean it up.
-			// This path is getting complicated.
-			// Let's stick to the plan: "Deploy store.add() or store.put() or store.delete() and explicitly await its resolution event."
-			// If we are iterating, we are doing multiple deletes.
-
-			// Alternative: Collect keys to delete, then delete them one by one?
-			// Or just use the simple PK deletion for now as MVP.
-		} else {
-			cursor.Call("continue")
-		}
-
-		return nil
-	})
-	defer successFunc.Release()
-
-	// If we are here, we probably didn't implement complex delete yet.
-	// Let's implement the simple PK delete first as it covers 90% of cases.
-	return Err("Complex delete with conditions not fully implemented yet, only single PK delete supported via conditions")
+	return Err("delete requires a single equality condition on the primary key")
 }
 
 func (d *IndexDBAdapter) readOne(q orm.Query, m orm.Model) error {
@@ -179,18 +87,16 @@ func (d *IndexDBAdapter) readOne(q orm.Query, m orm.Model) error {
 		return err
 	}
 
-	// Attempt to get by key if simple condition
+	// Attempt to get by key if simple condition. We only do this if we are querying the PK.
+	// For simplicity, we'll try `get` first if it's a single equality, and fall back to cursor.
 	if len(q.Conditions) == 1 && q.Conditions[0].Operator() == "=" {
 		key := q.Conditions[0].Value()
 		req := store.Call("get", key)
 		result, err := processRequest(req)
-		if err != nil {
-			return err
+		if err == nil && result.Truthy() {
+			return mapResult(result, m)
 		}
-		if !result.Truthy() {
-			return Err("record not found")
-		}
-		return mapResult(result, m)
+		// If not found by key, maybe it wasn't the PK. Fall back to cursor.
 	}
 
 	// Otherwise, iterate with cursor until first match
@@ -254,13 +160,17 @@ func (d *IndexDBAdapter) readAll(q orm.Query, factory func() orm.Model, each fun
 		}
 
 		if match {
-			newItem := factory()
-			err := mapResult(val, newItem)
-			if err != nil {
-				d.logger("Mapping error:", err)
-				return true // Continue even if mapping fails?
+			if factory != nil {
+				newItem := factory()
+				if newItem != nil {
+					err := mapResult(val, newItem)
+					if err != nil {
+						d.logger("Mapping error:", err)
+						return true // Continue even if mapping fails?
+					}
+					each(newItem)
+				}
 			}
-			each(newItem)
 		}
 
 		return true // Continue iteration
@@ -269,32 +179,37 @@ func (d *IndexDBAdapter) readAll(q orm.Query, factory func() orm.Model, each fun
 
 // mapResult maps a JS value to a Model's pointers
 func mapResult(val js.Value, m orm.Model) error {
-	cols := m.Columns()
+	fields := m.Schema()
 	ptrs := m.Pointers()
 
-	for i, col := range cols {
-		jsVal := val.Get(col)
+	for i, field := range fields {
+		jsVal := val.Get(field.Name)
 		if jsVal.IsUndefined() {
 			continue
 		}
 
-		// Map JS value to Go pointer
-		// We need to handle types.
-		dest := ptrs[i]
-
-		switch v := dest.(type) {
-		case *string:
-			*v = jsVal.String()
-		case *int:
-			*v =(jsVal.Int())
-		case *float64:
-			*v = jsVal.Float()
-		case *bool:
-			*v = jsVal.Bool()
-		// Add other types as needed
-		default:
-			// Fallback or error?
-			// For now, minimal support
+		ptr := ptrs[i]
+		switch field.Type {
+		case orm.TypeText:
+			if p, ok := ptr.(*string); ok {
+				*p = jsVal.String()
+			}
+		case orm.TypeInt64:
+			if p, ok := ptr.(*int64); ok {
+				*p = int64(jsVal.Int())
+			} else if p, ok := ptr.(*int); ok {
+				*p = jsVal.Int()
+			}
+		case orm.TypeFloat64:
+			if p, ok := ptr.(*float64); ok {
+				*p = jsVal.Float()
+			}
+		case orm.TypeBool:
+			if p, ok := ptr.(*bool); ok {
+				*p = jsVal.Bool()
+			}
+		case orm.TypeBlob:
+			// []byte from Uint8Array if needed — skip for now, not used in indexdb
 		}
 	}
 	return nil
@@ -334,8 +249,50 @@ func checkCondition(val js.Value, cond orm.Condition) bool {
 			if v2, ok := condVal.(int); ok {
 				return v1 > float64(v2)
 			}
+		} else if v1, ok := goVal.(string); ok {
+			if v2, ok := condVal.(string); ok {
+				return v1 > v2
+			}
 		}
-	// ... Implement other operators
+	case ">=":
+		if v1, ok := goVal.(float64); ok {
+			if v2, ok := condVal.(float64); ok {
+				return v1 >= v2
+			}
+			if v2, ok := condVal.(int); ok {
+				return v1 >= float64(v2)
+			}
+		} else if v1, ok := goVal.(string); ok {
+			if v2, ok := condVal.(string); ok {
+				return v1 >= v2
+			}
+		}
+	case "<":
+		if v1, ok := goVal.(float64); ok {
+			if v2, ok := condVal.(float64); ok {
+				return v1 < v2
+			}
+			if v2, ok := condVal.(int); ok {
+				return v1 < float64(v2)
+			}
+		} else if v1, ok := goVal.(string); ok {
+			if v2, ok := condVal.(string); ok {
+				return v1 < v2
+			}
+		}
+	case "<=":
+		if v1, ok := goVal.(float64); ok {
+			if v2, ok := condVal.(float64); ok {
+				return v1 <= v2
+			}
+			if v2, ok := condVal.(int); ok {
+				return v1 <= float64(v2)
+			}
+		} else if v1, ok := goVal.(string); ok {
+			if v2, ok := condVal.(string); ok {
+				return v1 <= v2
+			}
+		}
 	}
 
 	return false

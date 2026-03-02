@@ -37,20 +37,21 @@ func SetupDB(logger func(...any), dbName string, structTables ...any) *orm.DB {
 }
 
 // User represents a sample struct for testing table creation
-// We need to implement orm.Model interface for User now
 type User struct {
 	ID    string
 	Name  string
 	Email string
 }
 
-func (u User) StructName() string {
-	return "user"
-}
-
 // ORM Model interface implementation
 func (u *User) TableName() string { return "user" }
-func (u *User) Columns() []string { return []string{"ID", "Name", "Email"} }
+func (u *User) Schema() []orm.Field {
+	return []orm.Field{
+		{Name: "ID", Type: orm.TypeText, Constraints: orm.ConstraintPK},
+		{Name: "Name", Type: orm.TypeText},
+		{Name: "Email", Type: orm.TypeText},
+	}
+}
 func (u *User) Values() []any     { return []any{u.ID, u.Name, u.Email} }
 func (u *User) Pointers() []any   { return []any{&u.ID, &u.Name, &u.Email} }
 
@@ -61,12 +62,14 @@ type Product struct {
 	Price     float64
 }
 
-func (p Product) StructName() string {
-	return "product"
-}
-
 // ORM Model interface implementation
 func (p *Product) TableName() string { return "product" }
-func (p *Product) Columns() []string { return []string{"IDProduct", "Name", "Price"} }
+func (p *Product) Schema() []orm.Field {
+	return []orm.Field{
+		{Name: "IDProduct", Type: orm.TypeText, Constraints: orm.ConstraintPK},
+		{Name: "Name", Type: orm.TypeText},
+		{Name: "Price", Type: orm.TypeFloat64},
+	}
+}
 func (p *Product) Values() []any     { return []any{p.IDProduct, p.Name, p.Price} }
 func (p *Product) Pointers() []any   { return []any{&p.IDProduct, &p.Name, &p.Price} }

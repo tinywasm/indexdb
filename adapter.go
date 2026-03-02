@@ -11,16 +11,11 @@ import (
 	"github.com/tinywasm/orm"
 )
 
-// Ensure IndexDBAdapter satisfies orm.Adapter
-var _ orm.Adapter = (*IndexDBAdapter)(nil)
 
 type idGenerator interface {
 	GetNewID() string
 }
 
-type structName interface {
-	StructName() string
-}
 
 type IndexDBAdapter struct {
 	dbName string
@@ -32,6 +27,165 @@ type IndexDBAdapter struct {
 	initDone      chan struct{}
 	initOnce      sync.Once
 	initCompleted bool
+}
+
+// Exec implements orm.Executor
+func (d *IndexDBAdapter) Exec(query string, args ...any) error {
+	if len(args) == 0 {
+		return Err("no query passed")
+	}
+	q, ok := args[0].(orm.Query)
+	if !ok {
+		return Err("invalid query type")
+	}
+	if len(args) < 2 {
+		return Err("missing model argument")
+	}
+	m, ok := args[1].(orm.Model)
+	if !ok {
+		return Err("invalid model type")
+	}
+
+	return d.Execute(q, m, nil, nil)
+}
+
+// simpleScanner implements orm.Scanner
+type simpleScanner struct {
+	err error
+	ptrs []any
+}
+
+func (s *simpleScanner) Scan(dest ...any) error {
+	if s.err != nil {
+		return s.err
+	}
+	return nil
+}
+
+// QueryRow implements orm.Executor
+func (d *IndexDBAdapter) QueryRow(query string, args ...any) orm.Scanner {
+	if len(args) == 0 {
+		return &simpleScanner{err: Err("no query passed")}
+	}
+	q, ok := args[0].(orm.Query)
+	if !ok {
+		return &simpleScanner{err: Err("invalid query type")}
+	}
+	if len(args) < 2 {
+		return &simpleScanner{err: Err("missing model argument")}
+	}
+	m, ok := args[1].(orm.Model)
+	if !ok {
+		return &simpleScanner{err: Err("invalid model type")}
+	}
+
+	err := d.Execute(q, m, nil, nil)
+	return &simpleScanner{err: err}
+}
+
+// simpleRows implements orm.Rows
+type simpleRows struct {
+	models []orm.Model
+	idx    int
+}
+
+func (r *simpleRows) Next() bool {
+	if r.idx < len(r.models) {
+		r.idx++
+		return true
+	}
+	return false
+}
+
+func (r *simpleRows) Scan(dest ...any) error {
+	if r.idx == 0 || r.idx > len(r.models) {
+		return Err("invalid row cursor")
+	}
+	m := r.models[r.idx-1]
+
+	ptrs := m.Pointers()
+	if len(ptrs) != len(dest) {
+		return Err("scan destination mismatch")
+	}
+
+	for i, p := range ptrs {
+		destPtr := dest[i]
+		srcPtr := p
+
+		switch d := destPtr.(type) {
+		case *string:
+			*d = *(srcPtr.(*string))
+		case *int:
+			*d = *(srcPtr.(*int))
+		case *float64:
+			*d = *(srcPtr.(*float64))
+		case *bool:
+			*d = *(srcPtr.(*bool))
+		case *any:
+			*d = *(srcPtr.(*any))
+		}
+	}
+
+	return nil
+}
+
+func (r *simpleRows) Close() error { return nil }
+func (r *simpleRows) Err() error   { return nil }
+
+// Query implements orm.Executor
+func (d *IndexDBAdapter) Query(query string, args ...any) (orm.Rows, error) {
+	if len(args) == 0 {
+		return nil, Err("no query passed")
+	}
+	q, ok := args[0].(orm.Query)
+	if !ok {
+		return nil, Err("invalid query type")
+	}
+	if len(args) < 2 {
+		return nil, Err("missing model argument")
+	}
+	m, ok := args[1].(orm.Model)
+	if !ok {
+		return nil, Err("invalid model type")
+	}
+
+	var models []orm.Model
+	factory := func() orm.Model {
+		if m == nil {
+			return nil
+		}
+		t := reflect.TypeOf(m)
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+		newModel := reflect.New(t).Interface().(orm.Model)
+		return newModel
+	}
+
+	if len(args) > 2 {
+		if f, ok := args[2].(func() orm.Model); ok {
+			factory = f
+		}
+	}
+
+	each := func(model orm.Model) {
+		models = append(models, model)
+	}
+
+	err := d.Execute(q, m, factory, each)
+	if err != nil {
+		return nil, err
+	}
+
+	return &simpleRows{models: models, idx: 0}, nil
+}
+
+// Close implements orm.Executor
+func (d *IndexDBAdapter) Close() error {
+	if d.db.Truthy() {
+		d.db.Call("close")
+	}
+	return nil
 }
 
 // NewAdapter creates a new IndexDBAdapter.
@@ -51,11 +205,20 @@ func NewAdapter(dbName string, idg idGenerator, logger func(...any)) *IndexDBAda
 	}
 }
 
+// Compiler converts ORM queries into engine instructions.
+type IndexDBCompiler struct{}
+
+func (c *IndexDBCompiler) Compile(q orm.Query, m orm.Model) (orm.Plan, error) {
+	// Our adapter executes queries directly. We can pass the query and model as args in the plan.
+	return orm.Plan{Mode: q.Action, Query: "", Args: []any{q, m}}, nil
+}
+
 // InitDB initializes the IndexedDB database and returns an *orm.DB instance.
 func InitDB(dbName string, idg idGenerator, logger func(...any), structTables ...any) *orm.DB {
 	adapter := NewAdapter(dbName, idg, logger)
 	adapter.Initialize(structTables...)
-	return orm.New(adapter)
+	compiler := &IndexDBCompiler{}
+	return orm.New(adapter, compiler)
 }
 
 // Initialize initializes the IndexedDB database and creates object stores based on the provided structs.
@@ -95,13 +258,13 @@ func (d *IndexDBAdapter) onUpgradeNeeded(this js.Value, p []js.Value) any {
 	}
 
 	for i, table := range d.tables {
-		t, ok := table.(structName)
+		m, ok := table.(orm.Model)
 		if !ok {
-			d.logger("error table", i, "does not implement structName interface (Name() string)")
+			d.logger("table", i, "does not implement orm.Model interface, skipping")
 			continue
 		}
 
-		err := d.createTable(t.StructName(), table)
+		err := d.createTable(m)
 		if err != nil {
 			d.logger(err)
 			continue
@@ -148,49 +311,46 @@ func (d *IndexDBAdapter) onOpenExistingDB(this js.Value, p []js.Value) any {
 	return nil
 }
 
-// createTable creates a table for the given struct type.
-// Adapted from table.go but for IndexDBAdapter.
-func (d *IndexDBAdapter) createTable(tableName string, structType any) error {
-	st := reflect.TypeOf(structType)
-	if st.Kind() == reflect.Ptr {
-		st = st.Elem()
+// createTable creates an IndexedDB object store from the model's Schema.
+func (d *IndexDBAdapter) createTable(m orm.Model) error {
+	if d.initCompleted {
+		return Err("Dynamic table creation after initialization is not supported in IndexedDB adapter")
 	}
 
-	if st.Kind() == reflect.Struct {
-		if st.NumField() != 0 {
-			// Find primary key field
-			pk_name := ""
-			for i := 0; i < st.NumField(); i++ {
-				f := st.Field(i)
-				fieldName := f.Name
-				// IDorPrimaryKey is from github.com/tinywasm/fmt
-				_, isPK := IDorPrimaryKey(tableName, fieldName)
-				if isPK {
-					if pk_name != "" {
-						return Err("multiple primary keys found in struct")
-					}
-					pk_name = fieldName
-				}
-			}
-			if pk_name == "" {
-				return Err("no primary key found in struct")
-			}
+	fields := m.Schema()
+	tableName := m.TableName()
 
-			// Create object store
-			newTable := d.db.Call("createObjectStore", tableName, map[string]interface{}{"keyPath": pk_name})
-
-			// Create indexes for all fields except primary key
-			for i := 0; i < st.NumField(); i++ {
-				f := st.Field(i)
-				fieldName := f.Name
-
-				// Skip primary key field (it's the keyPath)
-				_, unique := IDorPrimaryKey(tableName, fieldName)
-
-				// Create index for the field
-				newTable.Call("createIndex", fieldName, fieldName, map[string]interface{}{"unique": unique})
-			}
+	pkName := ""
+	for _, f := range fields {
+		if f.Constraints&orm.ConstraintPK != 0 {
+			pkName = f.Name
+			break
 		}
+	}
+	if pkName == "" {
+		return Err("no primary key found in schema for table", tableName)
+	}
+
+	autoIncrement := false
+	for _, f := range fields {
+		if f.Constraints&orm.ConstraintAutoIncrement != 0 {
+			autoIncrement = true
+			break
+		}
+	}
+
+	opts := map[string]interface{}{"keyPath": pkName}
+	if autoIncrement {
+		opts["autoIncrement"] = true
+	}
+	newStore := d.db.Call("createObjectStore", tableName, opts)
+
+	for _, f := range fields {
+		if f.Name == pkName {
+			continue
+		}
+		unique := f.Constraints&orm.ConstraintUnique != 0
+		newStore.Call("createIndex", f.Name, f.Name, map[string]interface{}{"unique": unique})
 	}
 	return nil
 }
