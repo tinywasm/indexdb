@@ -1,10 +1,11 @@
-//go:build js && wasm
+//go:build wasm
 
-package indexdb_test
+package tests_test
 
 import (
-	"testing"
 	"syscall/js"
+	"testing"
+
 	"github.com/tinywasm/indexdb"
 	"github.com/tinywasm/orm"
 )
@@ -43,67 +44,119 @@ func TestMapResultTypes(t *testing.T) {
 
 	// Construct a synthetic js.Value object
 	jsObj := js.ValueOf(map[string]any{
-		"ID": "test_id",
+		"ID":    "test_id",
 		"Score": 99.5,
-		"Age": 42,
+		"Age":   42,
 		"Valid": true,
-		"Time": 1234567890,
-		"Blob": "skip", // not implemented for blobs yet
+		"Time":  1234567890,
+		"Blob":  "skip", // not implemented for blobs yet
 		// Missing field omitted intentionally to test IsUndefined
 	})
 
-	err := indexdb.ExportMapResult(jsObj, m)
+	err := indexdb.MapResult(jsObj, m)
 	if err != nil {
-		t.Fatalf("mapResult failed: %v", err)
+		t.Fatalf("MapResult failed: %v", err)
 	}
 
-	if m.ID != "test_id" { t.Errorf("Expected ID 'test_id', got %v", m.ID) }
-	if m.Score != 99.5 { t.Errorf("Expected Score 99.5, got %v", m.Score) }
-	if m.Age != 42 { t.Errorf("Expected Age 42, got %v", m.Age) }
-	if m.Valid != true { t.Errorf("Expected Valid true, got %v", m.Valid) }
-	if m.Time != 1234567890 { t.Errorf("Expected Time 1234567890, got %v", m.Time) }
+	if m.ID != "test_id" {
+		t.Errorf("Expected ID 'test_id', got %v", m.ID)
+	}
+	if m.Score != 99.5 {
+		t.Errorf("Expected Score 99.5, got %v", m.Score)
+	}
+	if m.Age != 42 {
+		t.Errorf("Expected Age 42, got %v", m.Age)
+	}
+	if m.Valid != true {
+		t.Errorf("Expected Valid true, got %v", m.Valid)
+	}
+	if m.Time != 1234567890 {
+		t.Errorf("Expected Time 1234567890, got %v", m.Time)
+	}
 }
 
 func TestCheckConditionOperators(t *testing.T) {
 	// JS string
 	strVal := js.ValueOf("hello")
-	if !indexdb.ExportCheckCondition(strVal, orm.Eq("f", "hello")) { t.Error("string = hello failed") }
-	if !indexdb.ExportCheckCondition(strVal, orm.Neq("f", "world")) { t.Error("string != world failed") }
-	if indexdb.ExportCheckCondition(strVal, orm.Gt("f", "world")) { t.Error("string > world should fail usually unless hello>world") } // hello is not > world
+	if !indexdb.CheckCondition(strVal, orm.Eq("f", "hello")) {
+		t.Error("string = hello failed")
+	}
+	if !indexdb.CheckCondition(strVal, orm.Neq("f", "world")) {
+		t.Error("string != world failed")
+	}
+	if indexdb.CheckCondition(strVal, orm.Gt("f", "world")) {
+		t.Error("string > world should fail usually unless hello>world")
+	} // hello is not > world
 
 	strValWorld := js.ValueOf("world")
-	if !indexdb.ExportCheckCondition(strValWorld, orm.Gt("f", "hello")) { t.Error("string > hello failed") }
-	if !indexdb.ExportCheckCondition(strValWorld, orm.Gte("f", "hello")) { t.Error("string >= hello failed") }
-	if !indexdb.ExportCheckCondition(strVal, orm.Lt("f", "world")) { t.Error("string < world failed") }
-	if !indexdb.ExportCheckCondition(strVal, orm.Lte("f", "world")) { t.Error("string <= world failed") }
+	if !indexdb.CheckCondition(strValWorld, orm.Gt("f", "hello")) {
+		t.Error("string > hello failed")
+	}
+	if !indexdb.CheckCondition(strValWorld, orm.Gte("f", "hello")) {
+		t.Error("string >= hello failed")
+	}
+	if !indexdb.CheckCondition(strVal, orm.Lt("f", "world")) {
+		t.Error("string < world failed")
+	}
+	if !indexdb.CheckCondition(strVal, orm.Lte("f", "world")) {
+		t.Error("string <= world failed")
+	}
 
 	// JS Number
 	numVal := js.ValueOf(42.5)
-	if !indexdb.ExportCheckCondition(numVal, orm.Eq("f", 42.5)) { t.Error("num = 42.5 failed") }
-	if indexdb.ExportCheckCondition(numVal, orm.Eq("f", 42.0)) { t.Error("num = 42.0 should fail") }
+	if !indexdb.CheckCondition(numVal, orm.Eq("f", 42.5)) {
+		t.Error("num = 42.5 failed")
+	}
+	if indexdb.CheckCondition(numVal, orm.Eq("f", 42.0)) {
+		t.Error("num = 42.0 should fail")
+	}
 
-	if !indexdb.ExportCheckCondition(numVal, orm.Neq("f", 42.0)) { t.Error("num != 42.0 failed") }
+	if !indexdb.CheckCondition(numVal, orm.Neq("f", 42.0)) {
+		t.Error("num != 42.0 failed")
+	}
 
-	if !indexdb.ExportCheckCondition(numVal, orm.Gt("f", 40.0)) { t.Error("num > 40.0 failed") }
-	if !indexdb.ExportCheckCondition(numVal, orm.Gt("f", 40)) { t.Error("num > 40 failed") }
+	if !indexdb.CheckCondition(numVal, orm.Gt("f", 40.0)) {
+		t.Error("num > 40.0 failed")
+	}
+	if !indexdb.CheckCondition(numVal, orm.Gt("f", 40)) {
+		t.Error("num > 40 failed")
+	}
 
-	if !indexdb.ExportCheckCondition(numVal, orm.Gte("f", 42.5)) { t.Error("num >= 42.5 failed") }
-	if !indexdb.ExportCheckCondition(numVal, orm.Gte("f", 42)) { t.Error("num >= 42 failed") }
+	if !indexdb.CheckCondition(numVal, orm.Gte("f", 42.5)) {
+		t.Error("num >= 42.5 failed")
+	}
+	if !indexdb.CheckCondition(numVal, orm.Gte("f", 42)) {
+		t.Error("num >= 42 failed")
+	}
 
-	if !indexdb.ExportCheckCondition(numVal, orm.Lt("f", 50.0)) { t.Error("num < 50.0 failed") }
-	if !indexdb.ExportCheckCondition(numVal, orm.Lt("f", 50)) { t.Error("num < 50 failed") }
+	if !indexdb.CheckCondition(numVal, orm.Lt("f", 50.0)) {
+		t.Error("num < 50.0 failed")
+	}
+	if !indexdb.CheckCondition(numVal, orm.Lt("f", 50)) {
+		t.Error("num < 50 failed")
+	}
 
-	if !indexdb.ExportCheckCondition(numVal, orm.Lte("f", 42.5)) { t.Error("num <= 42.5 failed") }
-	if !indexdb.ExportCheckCondition(numVal, orm.Lte("f", 43)) { t.Error("num <= 43 failed") }
+	if !indexdb.CheckCondition(numVal, orm.Lte("f", 42.5)) {
+		t.Error("num <= 42.5 failed")
+	}
+	if !indexdb.CheckCondition(numVal, orm.Lte("f", 43)) {
+		t.Error("num <= 43 failed")
+	}
 
 	// JS Bool
 	boolVal := js.ValueOf(true)
-	if !indexdb.ExportCheckCondition(boolVal, orm.Eq("f", true)) { t.Error("bool = true failed") }
-	if !indexdb.ExportCheckCondition(boolVal, orm.Neq("f", false)) { t.Error("bool != false failed") }
+	if !indexdb.CheckCondition(boolVal, orm.Eq("f", true)) {
+		t.Error("bool = true failed")
+	}
+	if !indexdb.CheckCondition(boolVal, orm.Neq("f", false)) {
+		t.Error("bool != false failed")
+	}
 
 	// Unknown JS Type (Array)
 	arrVal := js.ValueOf([]any{})
-	if indexdb.ExportCheckCondition(arrVal, orm.Eq("f", 1)) { t.Error("array eq should fail") }
+	if indexdb.CheckCondition(arrVal, orm.Eq("f", 1)) {
+		t.Error("array eq should fail")
+	}
 }
 
 func TestExecuteDefaultAction(t *testing.T) {
@@ -119,9 +172,11 @@ func TestExecuteDefaultAction(t *testing.T) {
 type UnknownTable struct{}
 
 func (u *UnknownTable) TableName() string { return "unknown_table" }
-func (u *UnknownTable) Schema() []orm.Field { return []orm.Field{{Name: "id", Type: orm.TypeText, Constraints: orm.ConstraintPK}} }
-func (u *UnknownTable) Values() []any     { return []any{} }
-func (u *UnknownTable) Pointers() []any   { return []any{} }
+func (u *UnknownTable) Schema() []orm.Field {
+	return []orm.Field{{Name: "id", Type: orm.TypeText, Constraints: orm.ConstraintPK}}
+}
+func (u *UnknownTable) Values() []any   { return []any{} }
+func (u *UnknownTable) Pointers() []any { return []any{} }
 
 func TestExecuteActionNotImplemented(t *testing.T) {
 	logger := func(args ...any) { t.Log(args...) }
@@ -196,17 +251,16 @@ func TestProcessRequests(t *testing.T) {
 			"message": "mock message",
 		},
 	})
-	_, err := indexdb.ExportProcessRequest(dummyReq)
+	_, err := indexdb.ProcessRequest(dummyReq)
 	if err == nil {
 		t.Log("Expected error on mocked request")
 	}
 
-	err = indexdb.ExportProcessCursorRequest(dummyReq, func(c js.Value) bool { return false })
+	err = indexdb.ProcessCursorRequest(dummyReq, func(c js.Value) bool { return false })
 	if err == nil {
 		t.Log("Expected error on mocked cursor")
 	}
 }
-
 
 func TestAdapterQueryScanCoverage(t *testing.T) {
 	adapter := indexdb.NewAdapter("test_db_scan", nil, nil)

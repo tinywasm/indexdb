@@ -8,9 +8,9 @@ import (
 	. "github.com/tinywasm/fmt"
 )
 
-// processRequest handles an IndexedDB request (like add, put, get, delete)
+// ProcessRequest handles an IndexedDB request (like add, put, get, delete)
 // and returns the result or error via channels.
-func processRequest(req js.Value) (js.Value, error) {
+func ProcessRequest(req js.Value) (js.Value, error) {
 	done := make(chan struct{})
 	var result js.Value
 	var err error
@@ -44,9 +44,9 @@ func processRequest(req js.Value) (js.Value, error) {
 	return result, err
 }
 
-// processCursorRequest handles an IndexedDB cursor request (openCursor).
+// ProcessCursorRequest handles an IndexedDB cursor request (openCursor).
 // It iterates over the cursor and calls the provided callback for each item.
-func processCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error {
+func ProcessCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error {
 	done := make(chan struct{})
 	var err error
 

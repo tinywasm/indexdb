@@ -1,6 +1,6 @@
-//go:build js && wasm
+//go:build wasm
 
-package tests
+package tests_test
 
 import (
 	"fmt"
@@ -52,8 +52,8 @@ func (u *User) Schema() []orm.Field {
 		{Name: "Email", Type: orm.TypeText},
 	}
 }
-func (u *User) Values() []any     { return []any{u.ID, u.Name, u.Email} }
-func (u *User) Pointers() []any   { return []any{&u.ID, &u.Name, &u.Email} }
+func (u *User) Values() []any   { return []any{u.ID, u.Name, u.Email} }
+func (u *User) Pointers() []any { return []any{&u.ID, &u.Name, &u.Email} }
 
 // TestProduct represents another sample struct for testing
 type Product struct {
@@ -71,5 +71,5 @@ func (p *Product) Schema() []orm.Field {
 		{Name: "Price", Type: orm.TypeFloat64},
 	}
 }
-func (p *Product) Values() []any     { return []any{p.IDProduct, p.Name, p.Price} }
-func (p *Product) Pointers() []any   { return []any{&p.IDProduct, &p.Name, &p.Price} }
+func (p *Product) Values() []any   { return []any{p.IDProduct, p.Name, p.Price} }
+func (p *Product) Pointers() []any { return []any{&p.IDProduct, &p.Name, &p.Price} }

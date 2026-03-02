@@ -1,4 +1,4 @@
-//go:build js && wasm
+//go:build wasm
 
 package indexdb
 
@@ -42,7 +42,7 @@ func (d *IndexDBAdapter) create(q orm.Query, m orm.Model) error {
 
 	// Deploy store.add() and explicitly await its resolution event.
 	req := store.Call("add", data)
-	_, err = processRequest(req)
+	_, err = ProcessRequest(req)
 	return err
 }
 
@@ -61,7 +61,7 @@ func (d *IndexDBAdapter) update(q orm.Query, m orm.Model) error {
 
 	// Deploy store.put() and explicitly await its resolution event.
 	req := store.Call("put", data)
-	_, err = processRequest(req)
+	_, err = ProcessRequest(req)
 	return err
 }
 
@@ -74,7 +74,7 @@ func (d *IndexDBAdapter) delete(q orm.Query, m orm.Model) error {
 	if len(q.Conditions) == 1 && q.Conditions[0].Operator() == "=" {
 		pkValue := q.Conditions[0].Value()
 		req := store.Call("delete", pkValue)
-		_, err = processRequest(req)
+		_, err = ProcessRequest(req)
 		return err
 	}
 
@@ -92,9 +92,9 @@ func (d *IndexDBAdapter) readOne(q orm.Query, m orm.Model) error {
 	if len(q.Conditions) == 1 && q.Conditions[0].Operator() == "=" {
 		key := q.Conditions[0].Value()
 		req := store.Call("get", key)
-		result, err := processRequest(req)
+		result, err := ProcessRequest(req)
 		if err == nil && result.Truthy() {
-			return mapResult(result, m)
+			return MapResult(result, m)
 		}
 		// If not found by key, maybe it wasn't the PK. Fall back to cursor.
 	}
@@ -103,14 +103,14 @@ func (d *IndexDBAdapter) readOne(q orm.Query, m orm.Model) error {
 	req := store.Call("openCursor")
 	var found bool
 
-	err = processCursorRequest(req, func(cursor js.Value) bool {
+	err = ProcessCursorRequest(req, func(cursor js.Value) bool {
 		val := cursor.Get("value")
 
 		// Check conditions
 		match := true
 		for _, cond := range q.Conditions {
 			fieldVal := val.Get(cond.Field())
-			if !checkCondition(fieldVal, cond) {
+			if !CheckCondition(fieldVal, cond) {
 				match = false
 				break
 			}
@@ -118,7 +118,7 @@ func (d *IndexDBAdapter) readOne(q orm.Query, m orm.Model) error {
 
 		if match {
 			// Found it
-			err := mapResult(val, m)
+			err := MapResult(val, m)
 			if err != nil {
 				d.logger("Mapping error:", err)
 			}
@@ -146,14 +146,14 @@ func (d *IndexDBAdapter) readAll(q orm.Query, factory func() orm.Model, each fun
 
 	req := store.Call("openCursor")
 
-	return processCursorRequest(req, func(cursor js.Value) bool {
+	return ProcessCursorRequest(req, func(cursor js.Value) bool {
 		val := cursor.Get("value")
 
 		// Check conditions
 		match := true
 		for _, cond := range q.Conditions {
 			fieldVal := val.Get(cond.Field())
-			if !checkCondition(fieldVal, cond) {
+			if !CheckCondition(fieldVal, cond) {
 				match = false
 				break
 			}
@@ -163,7 +163,7 @@ func (d *IndexDBAdapter) readAll(q orm.Query, factory func() orm.Model, each fun
 			if factory != nil {
 				newItem := factory()
 				if newItem != nil {
-					err := mapResult(val, newItem)
+					err := MapResult(val, newItem)
 					if err != nil {
 						d.logger("Mapping error:", err)
 						return true // Continue even if mapping fails?
@@ -177,8 +177,8 @@ func (d *IndexDBAdapter) readAll(q orm.Query, factory func() orm.Model, each fun
 	})
 }
 
-// mapResult maps a JS value to a Model's pointers
-func mapResult(val js.Value, m orm.Model) error {
+// MapResult maps a JS value to a Model's pointers
+func MapResult(val js.Value, m orm.Model) error {
 	fields := m.Schema()
 	ptrs := m.Pointers()
 
@@ -215,8 +215,8 @@ func mapResult(val js.Value, m orm.Model) error {
 	return nil
 }
 
-// checkCondition checks if a JS value satisfies a condition
-func checkCondition(val js.Value, cond orm.Condition) bool {
+// CheckCondition checks if a JS value satisfies a condition
+func CheckCondition(val js.Value, cond orm.Condition) bool {
 	// Simple type checking and comparison
 	// This needs to be robust for types (string, number, boolean)
 

@@ -1,4 +1,4 @@
-//go:build js && wasm
+//go:build wasm
 
 package tests_test
 
@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/tinywasm/indexdb"
-	"github.com/tinywasm/indexdb/tests"
 	"github.com/tinywasm/orm"
 )
 
@@ -18,7 +17,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	}
 
 	// Setup the database with tables
-	db := tests.SetupDB(logger, "", &tests.User{}, &tests.Product{})
+	db := SetupDB(logger, "", &User{}, &Product{})
 
 	// Tables should be implicitly created by InitDB during SetupDB.
 	// We no longer manually test TableExist here because the ORM wrapper handles it via adapter.
@@ -43,7 +42,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	// OR we can make the adapter handle it if empty?
 	// The `GetNewID` helper is on adapter.
 
-	userOne := tests.User{Name: "Alice", Email: "alice@example.com"}
+	userOne := User{Name: "Alice", Email: "alice@example.com"}
 	userOne.ID = "1" // Manually assigning simple ID for test since we no longer access adapter directly
 
 	err := db.Create(&userOne)
@@ -56,7 +55,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	}
 
 	// READ ONE
-	var userRead tests.User
+	var userRead User
 	err = db.Query(&userRead).Where("ID").Eq(userOne.ID).ReadOne()
 	if err != nil {
 		t.Fatalf("Failed to read user: %v", err)
@@ -73,7 +72,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	}
 
 	// Verify Update
-	var userUpdated tests.User
+	var userUpdated User
 	err = db.Query(&userUpdated).Where("ID").Eq(userOne.ID).ReadOne()
 	if err != nil {
 		t.Fatalf("Failed to read updated user: %v", err)
@@ -89,34 +88,34 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	}
 
 	// Verify Delete
-	var userDeleted tests.User
+	var userDeleted User
 	err = db.Query(&userDeleted).Where("ID").Eq(userOne.ID).ReadOne()
 	if err == nil {
 		t.Fatal("Expected error finding deleted user, got nil")
 	}
 
 	// Delete on non-existent
-	err = db.Delete(&tests.User{ID: "999999"}, orm.Eq("ID", "999999"))
+	err = db.Delete(&User{ID: "999999"}, orm.Eq("ID", "999999"))
 	if err != nil {
 		t.Logf("Delete non-existent returned error: %v", err)
 	}
 
 	// Delete multi-condition
-	err = db.Delete(&tests.User{ID: "1"}, orm.Eq("ID", "1"), orm.Eq("Name", "Alice"))
+	err = db.Delete(&User{ID: "1"}, orm.Eq("ID", "1"), orm.Eq("Name", "Alice"))
 	if err == nil {
 		t.Fatal("Expected error finding multi-condition delete, got nil")
 	}
 
 	// ReadOne via cursor path (no single PK condition)
-	var alice tests.User
+	var alice User
 	err = db.Query(&alice).Where("Name").Eq("Alice").ReadOne()
 	if err != nil {
 		t.Logf("ReadOne by name returned: %v", err)
 	}
 
 	// Create and read by non-PK to find it
-	db.Create(&tests.User{ID: "bob_id", Name: "Bob", Email: "bob@domain.com"})
-	var bob tests.User
+	db.Create(&User{ID: "bob_id", Name: "Bob", Email: "bob@domain.com"})
+	var bob User
 	err = db.Query(&bob).Where("Name").Eq("Bob").ReadOne()
 	if err != nil {
 		t.Fatalf("Failed to read Bob by name: %v", err)
@@ -126,9 +125,9 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	}
 
 	// Read All via Cursor
-	var users []tests.User
-	err = db.Query(&tests.User{}).Where("Name").Eq("Bob").ReadAll(func() orm.Model { return &tests.User{} }, func(m orm.Model) {
-		users = append(users, *(m.(*tests.User)))
+	var users []User
+	err = db.Query(&User{}).Where("Name").Eq("Bob").ReadAll(func() orm.Model { return &User{} }, func(m orm.Model) {
+		users = append(users, *(m.(*User)))
 	})
 	if err != nil {
 		t.Fatalf("ReadAll by Name failed: %v", err)
@@ -141,7 +140,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 // Test close execution branch
 func TestCloseDb(t *testing.T) {
 	logger := func(args ...any) {}
-	db := tests.SetupDB(logger, "close_db", &tests.User{})
+	db := SetupDB(logger, "close_db", &User{})
 	// Assuming raw executor handles Close
 	_ = db.Close()
 	// Should not panic
@@ -150,7 +149,7 @@ func TestCloseDb(t *testing.T) {
 // Extra coverage for TableExist
 func TestTableExist(t *testing.T) {
 	// Let's use SetupDB normally, indexdb is not imported as indexdb in tests package except in setup.go
-	db := tests.SetupDB(t.Log, "exist_db", &tests.User{})
+	db := SetupDB(t.Log, "exist_db", &User{})
 	// Try accessing raw adapter via db.RawExecutor
 	raw := db.RawExecutor()
 	if raw != nil {
@@ -172,9 +171,9 @@ func TestTableExist(t *testing.T) {
 
 // Extra ReadAll edge cases
 func TestReadAllEdgeCases(t *testing.T) {
-	db := tests.SetupDB(t.Log, "readall_edge", &tests.User{})
+	db := SetupDB(t.Log, "readall_edge", &User{})
 
-	db.Create(&tests.User{ID: "edge1", Name: "Edge1"})
+	db.Create(&User{ID: "edge1", Name: "Edge1"})
 
 	// Test ReadAll where mapResult fails or skip some fields?
 	// It's covered mostly by the mock.
