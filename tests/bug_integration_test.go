@@ -59,11 +59,11 @@ func TestBugScenario(t *testing.T) {
 
 	t.Run("MultipleInitialization", func(t *testing.T) {
 		dbName := "multi_init_test"
-		db1 := indexdb.InitDB(dbName, nil, logger, &SimpleUser{})
+		db1 := indexdb.New(dbName, nil, logger, &SimpleUser{})
 		_ = db1
 
 		// Initialize again
-		db2 := indexdb.InitDB(dbName, nil, logger, &SimpleUser{})
+		db2 := indexdb.New(dbName, nil, logger, &SimpleUser{})
 		if db2 == nil {
 			t.Fatal("Second initialization failed")
 		}
@@ -71,9 +71,9 @@ func TestBugScenario(t *testing.T) {
 
 	t.Run("WaitForSuccess", func(t *testing.T) {
 		dbName := "wait_success_test"
-		// This test is implicit because InitDB blocks until initDone is closed.
+		// This test is implicit because New blocks until initDone is closed.
 		// If it doesn't block, subsequent operations would fail.
-		db := indexdb.InitDB(dbName, nil, logger, &SimpleUser{})
+		db := indexdb.New(dbName, nil, logger, &SimpleUser{})
 
 		err := db.Create(&SimpleUser{ID: "u1", Email: "u1@test.com"})
 		if err != nil {

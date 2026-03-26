@@ -3,7 +3,6 @@
 package indexdb
 
 import (
-	"reflect"
 	"sync"
 	"syscall/js"
 
@@ -15,7 +14,7 @@ type idGenerator interface {
 	GetNewID() string
 }
 
-type IndexDBAdapter struct {
+type adapter struct {
 	dbName string
 	db     js.Value
 	tables []any
@@ -28,7 +27,7 @@ type IndexDBAdapter struct {
 }
 
 // Exec implements orm.Executor
-func (d *IndexDBAdapter) Exec(query string, args ...any) error {
+func (d *adapter) Exec(query string, args ...any) error {
 	if len(args) == 0 {
 		return Err("no query passed")
 	}
@@ -44,7 +43,7 @@ func (d *IndexDBAdapter) Exec(query string, args ...any) error {
 		return Err("invalid model type")
 	}
 
-	return d.Execute(q, m, nil, nil)
+	return d.execute(q, m, nil, nil, nil)
 }
 
 // simpleScanner implements orm.Scanner
@@ -61,7 +60,7 @@ func (s *simpleScanner) Scan(dest ...any) error {
 }
 
 // QueryRow implements orm.Executor
-func (d *IndexDBAdapter) QueryRow(query string, args ...any) orm.Scanner {
+func (d *adapter) QueryRow(query string, args ...any) orm.Scanner {
 	if len(args) == 0 {
 		return &simpleScanner{err: Err("no query passed")}
 	}
@@ -77,18 +76,24 @@ func (d *IndexDBAdapter) QueryRow(query string, args ...any) orm.Scanner {
 		return &simpleScanner{err: Err("invalid model type")}
 	}
 
-	err := d.Execute(q, m, nil, nil)
+	err := d.execute(q, m, nil, nil, nil)
 	return &simpleScanner{err: err}
 }
 
 // simpleRows implements orm.Rows
 type simpleRows struct {
 	models []Model
+	values []js.Value
+	fields []Field
 	idx    int
 }
 
 func (r *simpleRows) Next() bool {
-	if r.idx < len(r.models) {
+	count := len(r.models)
+	if count == 0 {
+		count = len(r.values)
+	}
+	if r.idx < count {
 		r.idx++
 		return true
 	}
@@ -96,31 +101,70 @@ func (r *simpleRows) Next() bool {
 }
 
 func (r *simpleRows) Scan(dest ...any) error {
-	if r.idx == 0 || r.idx > len(r.models) {
+	if r.idx == 0 || (r.idx > len(r.models) && r.idx > len(r.values)) {
 		return Err("invalid row cursor")
 	}
-	m := r.models[r.idx-1]
 
-	ptrs := m.Pointers()
-	if len(ptrs) != len(dest) {
-		return Err("scan destination mismatch")
+	if len(r.models) > 0 {
+		m := r.models[r.idx-1]
+		ptrs := m.Pointers()
+		if len(ptrs) != len(dest) {
+			return Err("scan destination mismatch")
+		}
+
+		for i, p := range ptrs {
+			destPtr := dest[i]
+			srcPtr := p
+
+			switch d := destPtr.(type) {
+			case *string:
+				*d = *(srcPtr.(*string))
+			case *int:
+				*d = *(srcPtr.(*int))
+			case *int64:
+				*d = *(srcPtr.(*int64))
+			case *float64:
+				*d = *(srcPtr.(*float64))
+			case *bool:
+				*d = *(srcPtr.(*bool))
+			case *any:
+				*d = *(srcPtr.(*any))
+			}
+		}
+		return nil
 	}
 
-	for i, p := range ptrs {
-		destPtr := dest[i]
-		srcPtr := p
+	val := r.values[r.idx-1]
+	if len(r.fields) != len(dest) {
+		return Err("scan destination mismatch with fields")
+	}
 
-		switch d := destPtr.(type) {
-		case *string:
-			*d = *(srcPtr.(*string))
-		case *int:
-			*d = *(srcPtr.(*int))
-		case *float64:
-			*d = *(srcPtr.(*float64))
-		case *bool:
-			*d = *(srcPtr.(*bool))
-		case *any:
-			*d = *(srcPtr.(*any))
+	for i, field := range r.fields {
+		jsVal := val.Get(field.Name)
+		if jsVal.IsUndefined() {
+			continue
+		}
+
+		destPtr := dest[i]
+		switch field.Type {
+		case FieldText:
+			if p, ok := destPtr.(*string); ok {
+				*p = jsVal.String()
+			}
+		case FieldInt:
+			if p, ok := destPtr.(*int64); ok {
+				*p = int64(jsVal.Int())
+			} else if p, ok := destPtr.(*int); ok {
+				*p = jsVal.Int()
+			}
+		case FieldFloat:
+			if p, ok := destPtr.(*float64); ok {
+				*p = jsVal.Float()
+			}
+		case FieldBool:
+			if p, ok := destPtr.(*bool); ok {
+				*p = jsVal.Bool()
+			}
 		}
 	}
 
@@ -131,7 +175,7 @@ func (r *simpleRows) Close() error { return nil }
 func (r *simpleRows) Err() error   { return nil }
 
 // Query implements orm.Executor
-func (d *IndexDBAdapter) Query(query string, args ...any) (orm.Rows, error) {
+func (d *adapter) Query(query string, args ...any) (orm.Rows, error) {
 	if len(args) == 0 {
 		return nil, Err("no query passed")
 	}
@@ -148,17 +192,8 @@ func (d *IndexDBAdapter) Query(query string, args ...any) (orm.Rows, error) {
 	}
 
 	var models []Model
-	factory := func() Model {
-		if m == nil {
-			return nil
-		}
-		t := reflect.TypeOf(m)
-		if t.Kind() == reflect.Ptr {
-			t = t.Elem()
-		}
-		newModel := reflect.New(t).Interface().(Model)
-		return newModel
-	}
+	var values []js.Value
+	var factory func() Model
 
 	if len(args) > 2 {
 		if f, ok := args[2].(func() Model); ok {
@@ -166,35 +201,49 @@ func (d *IndexDBAdapter) Query(query string, args ...any) (orm.Rows, error) {
 		}
 	}
 
-	each := func(model Model) {
-		models = append(models, model)
+	var each func(Model)
+	var eachJS func(js.Value)
+
+	if factory != nil {
+		each = func(model Model) {
+			models = append(models, model)
+		}
+	} else {
+		eachJS = func(val js.Value) {
+			values = append(values, val)
+		}
 	}
 
-	err := d.Execute(q, m, factory, each)
+	err := d.execute(q, m, factory, each, eachJS)
 	if err != nil {
 		return nil, err
 	}
 
-	return &simpleRows{models: models, idx: 0}, nil
+	return &simpleRows{
+		models: models,
+		values: values,
+		fields: m.Schema(),
+		idx:    0,
+	}, nil
 }
 
 // Close implements orm.Executor
-func (d *IndexDBAdapter) Close() error {
+func (d *adapter) Close() error {
 	if d.db.Truthy() {
 		d.db.Call("close")
 	}
 	return nil
 }
 
-// NewAdapter creates a new IndexDBAdapter.
-func NewAdapter(dbName string, idg idGenerator, logger func(...any)) *IndexDBAdapter {
+// newAdapter creates a new adapter.
+func newAdapter(dbName string, idg idGenerator, logger func(...any)) *adapter {
 	if logger == nil {
 		logger = func(args ...any) {
 			Println(args...)
 		}
 	}
 
-	return &IndexDBAdapter{
+	return &adapter{
 		dbName:   dbName,
 		db:       js.Value{},
 		idGen:    idg,
@@ -204,23 +253,23 @@ func NewAdapter(dbName string, idg idGenerator, logger func(...any)) *IndexDBAda
 }
 
 // Compiler converts ORM queries into engine instructions.
-type IndexDBCompiler struct{}
+type compiler struct{}
 
-func (c *IndexDBCompiler) Compile(q orm.Query, m Model) (orm.Plan, error) {
+func (c *compiler) Compile(q orm.Query, m Model) (orm.Plan, error) {
 	// Our adapter executes queries directly. We can pass the query and model as args in the plan.
 	return orm.Plan{Mode: q.Action, Query: "", Args: []any{q, m}}, nil
 }
 
-// InitDB initializes the IndexedDB database and returns an *orm.DB instance.
-func InitDB(dbName string, idg idGenerator, logger func(...any), structTables ...any) *orm.DB {
-	adapter := NewAdapter(dbName, idg, logger)
-	adapter.Initialize(structTables...)
-	compiler := &IndexDBCompiler{}
+// New initializes the IndexedDB database and returns an *orm.DB instance.
+func New(dbName string, idg idGenerator, logger func(...any), structTables ...any) *orm.DB {
+	adapter := newAdapter(dbName, idg, logger)
+	adapter.initialize(structTables...)
+	compiler := &compiler{}
 	return orm.New(adapter, compiler)
 }
 
-// Initialize initializes the IndexedDB database and creates object stores based on the provided structs.
-func (d *IndexDBAdapter) Initialize(structTables ...any) {
+// initialize initializes the IndexedDB database and creates object stores based on the provided structs.
+func (d *adapter) initialize(structTables ...any) {
 	d.tables = structTables
 
 	// Open connection to IndexedDB
@@ -235,7 +284,7 @@ func (d *IndexDBAdapter) Initialize(structTables ...any) {
 	<-d.initDone
 }
 
-func (d *IndexDBAdapter) open(p *js.Value, message string) error {
+func (d *adapter) open(p *js.Value, message string) error {
 	d.db = p.Get("target").Get("result")
 
 	if !d.db.Truthy() {
@@ -244,7 +293,7 @@ func (d *IndexDBAdapter) open(p *js.Value, message string) error {
 	return nil
 }
 
-func (d *IndexDBAdapter) onUpgradeNeeded(this js.Value, p []js.Value) any {
+func (d *adapter) onUpgradeNeeded(this js.Value, p []js.Value) any {
 	// The event is fired on the request object, so 'this' is the request.
 	// p[0] is the event object.
 
@@ -289,12 +338,12 @@ func (d *IndexDBAdapter) onUpgradeNeeded(this js.Value, p []js.Value) any {
 	return nil
 }
 
-func (d *IndexDBAdapter) onShowDbError(this js.Value, p []js.Value) any {
+func (d *adapter) onShowDbError(this js.Value, p []js.Value) any {
 	d.logger("indexDB Error", p[0])
 	return nil
 }
 
-func (d *IndexDBAdapter) onOpenExistingDB(this js.Value, p []js.Value) any {
+func (d *adapter) onOpenExistingDB(this js.Value, p []js.Value) any {
 	err := d.open(&p[0], "OPEN")
 	if err != nil {
 		d.logger("open existing db error:", err)
@@ -310,7 +359,7 @@ func (d *IndexDBAdapter) onOpenExistingDB(this js.Value, p []js.Value) any {
 }
 
 // createTable creates an IndexedDB object store from the model's Schema.
-func (d *IndexDBAdapter) createTable(m Model) error {
+func (d *adapter) createTable(m Model) error {
 	if d.initCompleted {
 		return Err("Dynamic table creation after initialization is not supported in IndexedDB adapter")
 	}
@@ -352,8 +401,8 @@ func (d *IndexDBAdapter) createTable(m Model) error {
 	return nil
 }
 
-// TableExist checks if a table exists in the database
-func (d *IndexDBAdapter) TableExist(table_name string) bool {
+// tableExist checks if a table exists in the database
+func (d *adapter) tableExist(tableName string) bool {
 	if !d.db.Truthy() {
 		return false
 	}
@@ -364,7 +413,7 @@ func (d *IndexDBAdapter) TableExist(table_name string) bool {
 	// Iterate through the table names and check if the table already exists
 	for i := 0; i < length; i++ {
 		name := objectStoreNames.Index(i).String()
-		if name == table_name {
+		if name == tableName {
 			return true
 		}
 	}
@@ -372,8 +421,8 @@ func (d *IndexDBAdapter) TableExist(table_name string) bool {
 	return false
 }
 
-// Helper to access the ID generator
-func (d *IndexDBAdapter) GetNewID() string {
+// getNewID helper to access the ID generator
+func (d *adapter) getNewID() string {
 	if d.idGen != nil {
 		return d.idGen.GetNewID()
 	}

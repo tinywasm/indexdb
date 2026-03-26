@@ -1,12 +1,11 @@
 //go:build wasm
 
-package tests_test
+package indexdb
 
 import (
 	"testing"
 
 	. "github.com/tinywasm/fmt"
-	"github.com/tinywasm/indexdb"
 	"github.com/tinywasm/orm"
 )
 
@@ -20,28 +19,9 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	// Setup the database with tables
 	db := SetupDB(logger, "", &User{}, &Product{})
 
-	// Tables should be implicitly created by InitDB during SetupDB.
+	// Tables should be implicitly created by New during SetupDB.
 	// We no longer manually test TableExist here because the ORM wrapper handles it via adapter.
 	// If needed we could use reflection or type assertion to get adapter, but better to test functionally.
-
-	// CREATE User without id expected id to be auto generated
-	// BUT orm.Create expects the ID to be set IF it's not auto-increment by DB.
-	// IndexedDB can do auto-increment if keyPath is set and autoIncrement: true.
-	// Our adapter creation logic sets keyPath but not autoIncrement explicitly in createTable?
-	// `createObjectStore`, `map[string]interface{}{"keyPath": pk_name}` -> autoIncrement defaults to false.
-	// So we need to generate ID manually or update createTable.
-	// The legacy code had:
-	/*
-		if !id_exist || id.(string) == "" {
-			id = d.GetNewID()
-			data[pk_field] = id
-		}
-	*/
-	// We should probably replicate this ID generation logic in `create` method of adapter or rely on caller?
-	// The legacy code did it inside `Create`.
-	// Let's manually set ID for now as we are using ORM.
-	// OR we can make the adapter handle it if empty?
-	// The `GetNewID` helper is on adapter.
 
 	userOne := User{Name: "Alice", Email: "alice@example.com"}
 	userOne.ID = "1" // Manually assigning simple ID for test since we no longer access adapter directly
@@ -125,11 +105,14 @@ func TestIndexDBCrudOperations(t *testing.T) {
 		t.Fatalf("Expected Bob's ID to be bob_id, got %s", bob.ID)
 	}
 
-	// Read All via Cursor
+	// Read All via Cursor (using idiomatic ORM API)
 	var users []User
-	err = db.Query(&User{}).Where("Name").Eq("Bob").ReadAll(func() Model { return &User{} }, func(m Model) {
-		users = append(users, *(m.(*User)))
-	})
+	err = db.Query(&User{}).Where("Name").Eq("Bob").ReadAll(
+		func() Model { return &User{} },
+		func(m Model) {
+			users = append(users, *(m.(*User)))
+		},
+	)
 	if err != nil {
 		t.Fatalf("ReadAll by Name failed: %v", err)
 	}
@@ -147,22 +130,19 @@ func TestCloseDb(t *testing.T) {
 	// Should not panic
 }
 
-// Extra coverage for TableExist
+// Extra coverage for tableExist
 func TestTableExist(t *testing.T) {
-	// Let's use SetupDB normally, indexdb is not imported as indexdb in tests package except in setup.go
+	// Let's use SetupDB normally
 	db := SetupDB(t.Log, "exist_db", &User{})
 	// Try accessing raw adapter via db.RawExecutor
 	raw := db.RawExecutor()
 	if raw != nil {
-		// We can't easily assert to *indexdb.IndexDBAdapter without importing it,
-		// but `indexdb` IS imported at the top of table_test.go! Oh wait, let's check imports.
-		// "github.com/tinywasm/indexdb" is imported as `indexdb`.
-		if adapter, ok := raw.(*indexdb.IndexDBAdapter); ok {
-			exists := adapter.TableExist("user")
+		if a, ok := raw.(*adapter); ok {
+			exists := a.tableExist("user")
 			if !exists {
 				t.Error("Table user should exist")
 			}
-			notExists := adapter.TableExist("unknown")
+			notExists := a.tableExist("unknown")
 			if notExists {
 				t.Error("Table unknown should not exist")
 			}
@@ -175,7 +155,4 @@ func TestReadAllEdgeCases(t *testing.T) {
 	db := SetupDB(t.Log, "readall_edge", &User{})
 
 	db.Create(&User{ID: "edge1", Name: "Edge1"})
-
-	// Test ReadAll where mapResult fails or skip some fields?
-	// It's covered mostly by the mock.
 }

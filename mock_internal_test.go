@@ -1,13 +1,12 @@
 //go:build wasm
 
-package tests_test
+package indexdb
 
 import (
 	"syscall/js"
 	"testing"
 
 	. "github.com/tinywasm/fmt"
-	"github.com/tinywasm/indexdb"
 	"github.com/tinywasm/orm"
 )
 
@@ -54,9 +53,9 @@ func TestMapResultTypes(t *testing.T) {
 		// Missing field omitted intentionally to test IsUndefined
 	})
 
-	err := indexdb.MapResult(jsObj, m)
+	err := mapResult(jsObj, m)
 	if err != nil {
-		t.Fatalf("MapResult failed: %v", err)
+		t.Fatalf("mapResult failed: %v", err)
 	}
 
 	if m.ID != "test_id" {
@@ -79,83 +78,83 @@ func TestMapResultTypes(t *testing.T) {
 func TestCheckConditionOperators(t *testing.T) {
 	// JS string
 	strVal := js.ValueOf("hello")
-	if !indexdb.CheckCondition(strVal, orm.Eq("f", "hello")) {
+	if !checkCondition(strVal, orm.Eq("f", "hello")) {
 		t.Error("string = hello failed")
 	}
-	if !indexdb.CheckCondition(strVal, orm.Neq("f", "world")) {
+	if !checkCondition(strVal, orm.Neq("f", "world")) {
 		t.Error("string != world failed")
 	}
-	if indexdb.CheckCondition(strVal, orm.Gt("f", "world")) {
+	if checkCondition(strVal, orm.Gt("f", "world")) {
 		t.Error("string > world should fail usually unless hello>world")
 	} // hello is not > world
 
 	strValWorld := js.ValueOf("world")
-	if !indexdb.CheckCondition(strValWorld, orm.Gt("f", "hello")) {
+	if !checkCondition(strValWorld, orm.Gt("f", "hello")) {
 		t.Error("string > hello failed")
 	}
-	if !indexdb.CheckCondition(strValWorld, orm.Gte("f", "hello")) {
+	if !checkCondition(strValWorld, orm.Gte("f", "hello")) {
 		t.Error("string >= hello failed")
 	}
-	if !indexdb.CheckCondition(strVal, orm.Lt("f", "world")) {
+	if !checkCondition(strVal, orm.Lt("f", "world")) {
 		t.Error("string < world failed")
 	}
-	if !indexdb.CheckCondition(strVal, orm.Lte("f", "world")) {
+	if !checkCondition(strVal, orm.Lte("f", "world")) {
 		t.Error("string <= world failed")
 	}
 
 	// JS Number
 	numVal := js.ValueOf(42.5)
-	if !indexdb.CheckCondition(numVal, orm.Eq("f", 42.5)) {
+	if !checkCondition(numVal, orm.Eq("f", 42.5)) {
 		t.Error("num = 42.5 failed")
 	}
-	if indexdb.CheckCondition(numVal, orm.Eq("f", 42.0)) {
+	if checkCondition(numVal, orm.Eq("f", 42.0)) {
 		t.Error("num = 42.0 should fail")
 	}
 
-	if !indexdb.CheckCondition(numVal, orm.Neq("f", 42.0)) {
+	if !checkCondition(numVal, orm.Neq("f", 42.0)) {
 		t.Error("num != 42.0 failed")
 	}
 
-	if !indexdb.CheckCondition(numVal, orm.Gt("f", 40.0)) {
+	if !checkCondition(numVal, orm.Gt("f", 40.0)) {
 		t.Error("num > 40.0 failed")
 	}
-	if !indexdb.CheckCondition(numVal, orm.Gt("f", 40)) {
+	if !checkCondition(numVal, orm.Gt("f", 40)) {
 		t.Error("num > 40 failed")
 	}
 
-	if !indexdb.CheckCondition(numVal, orm.Gte("f", 42.5)) {
+	if !checkCondition(numVal, orm.Gte("f", 42.5)) {
 		t.Error("num >= 42.5 failed")
 	}
-	if !indexdb.CheckCondition(numVal, orm.Gte("f", 42)) {
+	if !checkCondition(numVal, orm.Gte("f", 42)) {
 		t.Error("num >= 42 failed")
 	}
 
-	if !indexdb.CheckCondition(numVal, orm.Lt("f", 50.0)) {
+	if !checkCondition(numVal, orm.Lt("f", 50.0)) {
 		t.Error("num < 50.0 failed")
 	}
-	if !indexdb.CheckCondition(numVal, orm.Lt("f", 50)) {
+	if !checkCondition(numVal, orm.Lt("f", 50)) {
 		t.Error("num < 50 failed")
 	}
 
-	if !indexdb.CheckCondition(numVal, orm.Lte("f", 42.5)) {
+	if !checkCondition(numVal, orm.Lte("f", 42.5)) {
 		t.Error("num <= 42.5 failed")
 	}
-	if !indexdb.CheckCondition(numVal, orm.Lte("f", 43)) {
+	if !checkCondition(numVal, orm.Lte("f", 43)) {
 		t.Error("num <= 43 failed")
 	}
 
 	// JS Bool
 	boolVal := js.ValueOf(true)
-	if !indexdb.CheckCondition(boolVal, orm.Eq("f", true)) {
+	if !checkCondition(boolVal, orm.Eq("f", true)) {
 		t.Error("bool = true failed")
 	}
-	if !indexdb.CheckCondition(boolVal, orm.Neq("f", false)) {
+	if !checkCondition(boolVal, orm.Neq("f", false)) {
 		t.Error("bool != false failed")
 	}
 
 	// Unknown JS Type (Array)
 	arrVal := js.ValueOf([]any{})
-	if indexdb.CheckCondition(arrVal, orm.Eq("f", 1)) {
+	if checkCondition(arrVal, orm.Eq("f", 1)) {
 		t.Error("array eq should fail")
 	}
 }
@@ -163,8 +162,8 @@ func TestCheckConditionOperators(t *testing.T) {
 func TestExecuteDefaultAction(t *testing.T) {
 	logger := func(args ...any) { t.Log(args...) }
 
-	adapter := indexdb.NewAdapter("test_db", nil, logger)
-	err := adapter.Execute(orm.Query{Action: 999}, nil, nil, nil)
+	adapter := newAdapter("test_db", nil, logger)
+	err := adapter.execute(orm.Query{Action: 999}, nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unimplemented action")
 	}
@@ -182,39 +181,39 @@ func (u *UnknownTable) Pointers() []any { return []any{} }
 func TestExecuteActionNotImplemented(t *testing.T) {
 	logger := func(args ...any) { t.Log(args...) }
 
-	// Create adapter directly to test Execute default case
-	adapter := indexdb.NewAdapter("test_db", nil, logger)
-	err := adapter.Execute(orm.Query{Action: 999}, nil, nil, nil)
+	// Create adapter directly to test execute default case
+	adapter := newAdapter("test_db", nil, logger)
+	err := adapter.execute(orm.Query{Action: 999}, nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unimplemented action")
 	}
 
 	// Test GetStore error on create
-	err = adapter.Execute(orm.Query{Action: orm.ActionCreate, Table: "non_existent"}, &UnknownTable{}, nil, nil)
+	err = adapter.execute(orm.Query{Action: orm.ActionCreate, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unitialized DB / GetStore")
 	}
 
 	// Test GetStore error on update
-	err = adapter.Execute(orm.Query{Action: orm.ActionUpdate, Table: "non_existent"}, &UnknownTable{}, nil, nil)
+	err = adapter.execute(orm.Query{Action: orm.ActionUpdate, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unitialized DB / GetStore on update")
 	}
 
 	// Test GetStore error on delete
-	err = adapter.Execute(orm.Query{Action: orm.ActionDelete, Table: "non_existent"}, &UnknownTable{}, nil, nil)
+	err = adapter.execute(orm.Query{Action: orm.ActionDelete, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unitialized DB / GetStore on delete")
 	}
 
 	// Test GetStore error on readOne
-	err = adapter.Execute(orm.Query{Action: orm.ActionReadOne, Table: "non_existent"}, &UnknownTable{}, nil, nil)
+	err = adapter.execute(orm.Query{Action: orm.ActionReadOne, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unitialized DB / GetStore on readOne")
 	}
 
 	// Test GetStore error on readAll
-	err = adapter.Execute(orm.Query{Action: orm.ActionReadAll, Table: "non_existent"}, &UnknownTable{}, nil, nil)
+	err = adapter.execute(orm.Query{Action: orm.ActionReadAll, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unitialized DB / GetStore on readAll")
 	}
@@ -252,19 +251,19 @@ func TestProcessRequests(t *testing.T) {
 			"message": "mock message",
 		},
 	})
-	_, err := indexdb.ProcessRequest(dummyReq)
+	_, err := processRequest(dummyReq)
 	if err == nil {
 		t.Log("Expected error on mocked request")
 	}
 
-	err = indexdb.ProcessCursorRequest(dummyReq, func(c js.Value) bool { return false })
+	err = processCursorRequest(dummyReq, func(c js.Value) bool { return false })
 	if err == nil {
 		t.Log("Expected error on mocked cursor")
 	}
 }
 
 func TestAdapterQueryScanCoverage(t *testing.T) {
-	adapter := indexdb.NewAdapter("test_db_scan", nil, nil)
+	adapter := newAdapter("test_db_scan", nil, nil)
 
 	// We'll just call adapter.Query with the mock rows logic
 	// Mock executing Query on uninitialized DB - hits execute error.
