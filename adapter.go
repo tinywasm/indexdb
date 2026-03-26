@@ -41,7 +41,7 @@ func (d *IndexDBAdapter) Exec(query string, args ...any) error {
 	if len(args) < 2 {
 		return Err("missing model argument")
 	}
-	m, ok := args[1].(orm.Model)
+	m, ok := args[1].(Model)
 	if !ok {
 		return Err("invalid model type")
 	}
@@ -74,7 +74,7 @@ func (d *IndexDBAdapter) QueryRow(query string, args ...any) orm.Scanner {
 	if len(args) < 2 {
 		return &simpleScanner{err: Err("missing model argument")}
 	}
-	m, ok := args[1].(orm.Model)
+	m, ok := args[1].(Model)
 	if !ok {
 		return &simpleScanner{err: Err("invalid model type")}
 	}
@@ -85,7 +85,7 @@ func (d *IndexDBAdapter) QueryRow(query string, args ...any) orm.Scanner {
 
 // simpleRows implements orm.Rows
 type simpleRows struct {
-	models []orm.Model
+	models []Model
 	idx    int
 }
 
@@ -144,13 +144,13 @@ func (d *IndexDBAdapter) Query(query string, args ...any) (orm.Rows, error) {
 	if len(args) < 2 {
 		return nil, Err("missing model argument")
 	}
-	m, ok := args[1].(orm.Model)
+	m, ok := args[1].(Model)
 	if !ok {
 		return nil, Err("invalid model type")
 	}
 
-	var models []orm.Model
-	factory := func() orm.Model {
+	var models []Model
+	factory := func() Model {
 		if m == nil {
 			return nil
 		}
@@ -158,17 +158,17 @@ func (d *IndexDBAdapter) Query(query string, args ...any) (orm.Rows, error) {
 		if t.Kind() == reflect.Ptr {
 			t = t.Elem()
 		}
-		newModel := reflect.New(t).Interface().(orm.Model)
+		newModel := reflect.New(t).Interface().(Model)
 		return newModel
 	}
 
 	if len(args) > 2 {
-		if f, ok := args[2].(func() orm.Model); ok {
+		if f, ok := args[2].(func() Model); ok {
 			factory = f
 		}
 	}
 
-	each := func(model orm.Model) {
+	each := func(model Model) {
 		models = append(models, model)
 	}
 
@@ -208,7 +208,7 @@ func NewAdapter(dbName string, idg idGenerator, logger func(...any)) *IndexDBAda
 // Compiler converts ORM queries into engine instructions.
 type IndexDBCompiler struct{}
 
-func (c *IndexDBCompiler) Compile(q orm.Query, m orm.Model) (orm.Plan, error) {
+func (c *IndexDBCompiler) Compile(q orm.Query, m Model) (orm.Plan, error) {
 	// Our adapter executes queries directly. We can pass the query and model as args in the plan.
 	return orm.Plan{Mode: q.Action, Query: "", Args: []any{q, m}}, nil
 }
@@ -258,9 +258,9 @@ func (d *IndexDBAdapter) onUpgradeNeeded(this js.Value, p []js.Value) any {
 	}
 
 	for i, table := range d.tables {
-		m, ok := table.(orm.Model)
+		m, ok := table.(Model)
 		if !ok {
-			d.logger("table", i, "does not implement orm.Model interface, skipping")
+			d.logger("table", i, "does not implement Model interface, skipping")
 			continue
 		}
 
@@ -312,17 +312,17 @@ func (d *IndexDBAdapter) onOpenExistingDB(this js.Value, p []js.Value) any {
 }
 
 // createTable creates an IndexedDB object store from the model's Schema.
-func (d *IndexDBAdapter) createTable(m orm.Model) error {
+func (d *IndexDBAdapter) createTable(m Model) error {
 	if d.initCompleted {
 		return Err("Dynamic table creation after initialization is not supported in IndexedDB adapter")
 	}
 
 	fields := m.Schema()
-	tableName := m.TableName()
+	tableName := m.ModelName()
 
 	pkName := ""
 	for _, f := range fields {
-		if f.Constraints&orm.ConstraintPK != 0 {
+		if f.PK {
 			pkName = f.Name
 			break
 		}
@@ -333,7 +333,7 @@ func (d *IndexDBAdapter) createTable(m orm.Model) error {
 
 	autoIncrement := false
 	for _, f := range fields {
-		if f.Constraints&orm.ConstraintAutoIncrement != 0 {
+		if f.AutoInc {
 			autoIncrement = true
 			break
 		}
@@ -349,8 +349,7 @@ func (d *IndexDBAdapter) createTable(m orm.Model) error {
 		if f.Name == pkName {
 			continue
 		}
-		unique := f.Constraints&orm.ConstraintUnique != 0
-		newStore.Call("createIndex", f.Name, f.Name, map[string]interface{}{"unique": unique})
+		newStore.Call("createIndex", f.Name, f.Name, map[string]interface{}{"unique": f.Unique})
 	}
 	return nil
 }

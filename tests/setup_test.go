@@ -5,6 +5,7 @@ package tests_test
 import (
 	"fmt"
 
+	. "github.com/tinywasm/fmt"
 	"github.com/tinywasm/indexdb"
 	"github.com/tinywasm/orm"
 )
@@ -44,12 +45,12 @@ type User struct {
 }
 
 // ORM Model interface implementation
-func (u *User) TableName() string { return "user" }
-func (u *User) Schema() []orm.Field {
-	return []orm.Field{
-		{Name: "ID", Type: orm.TypeText, Constraints: orm.ConstraintPK},
-		{Name: "Name", Type: orm.TypeText},
-		{Name: "Email", Type: orm.TypeText},
+func (u *User) ModelName() string { return "user" }
+func (u *User) Schema() []Field {
+	return []Field{
+		{Name: "ID", Type: FieldText, PK: true},
+		{Name: "Name", Type: FieldText},
+		{Name: "Email", Type: FieldText},
 	}
 }
 func (u *User) Values() []any   { return []any{u.ID, u.Name, u.Email} }
@@ -63,12 +64,12 @@ type Product struct {
 }
 
 // ORM Model interface implementation
-func (p *Product) TableName() string { return "product" }
-func (p *Product) Schema() []orm.Field {
-	return []orm.Field{
-		{Name: "IDProduct", Type: orm.TypeText, Constraints: orm.ConstraintPK},
-		{Name: "Name", Type: orm.TypeText},
-		{Name: "Price", Type: orm.TypeFloat64},
+func (p *Product) ModelName() string { return "product" }
+func (p *Product) Schema() []Field {
+	return []Field{
+		{Name: "IDProduct", Type: FieldText, PK: true},
+		{Name: "Name", Type: FieldText},
+		{Name: "Price", Type: FieldFloat},
 	}
 }
 func (p *Product) Values() []any   { return []any{p.IDProduct, p.Name, p.Price} }
