@@ -15,6 +15,12 @@ Improve `indexdb` robustness by implementing targeted integration tests designed
 
 ## Proposed Changes
 
+### [Component] Core API Update
+#### [MODIFY] [adapter.go](adapter.go) / [execute.go](execute.go)
+- Actualizar el uso de la API antigua de `orm.Model` a la nueva API `fmt.Model` definida en `tinywasm/fmt`.
+- Asegurar que la compatibilidad con el paquete central se mantenga luego de los últimos refactores en tinywasm/orm.
+
+
 ### [Component] Tests
 #### [NEW] [bug_integration_test.go](tests/bug_integration_test.go)
 - Implement minimal models to reproduce potential edge cases:
