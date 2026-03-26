@@ -1,66 +1,60 @@
-# Implementation Plan: IndexDB Bug-Hunting Integration Tests
+# IndexDB Improvement Plan
 
 ## Development Rules
-- **Prerequisites:** External agents must install `gotest` first:
+- **Testing Runner (gotest):** ALWAYS use the globally installed `gotest` CLI. DO NOT use `go test` directly. Install with:
   ```bash
   go install github.com/tinywasm/devflow/cmd/gotest@latest
   ```
-- **Standard Library Only:** NEVER use external assertion libraries (e.g., testify, gomega). Use only the standard testing and reflect APIs.
-- **Testing Runner (gotest):** For Go tests, ALWAYS use the globally installed `gotest` CLI command. DO NOT use `go test` directly. Simply type `gotest` (no arguments) for the full suite.
+  Run the full test suite by typing `gotest` (no arguments) from the package root.
 - **WASM Compatibility:** Use `tinywasm/fmt` instead of `fmt`/`strings`/`strconv`/`errors`.
 - **Single Responsibility Principle:** Every file must have a single purpose.
 
-## Goal
-Improve `indexdb` robustness by implementing targeted integration tests designed to find common bugs in IndexedDB adapters, specifically focusing on initialization, primary key handling, and asynchronous event resolution.
-
 ## Proposed Changes
 
-### [Component] Core API Update
-#### [MODIFY] [adapter.go](adapter.go) / [execute.go](execute.go)
-- Actualizar el uso de la API antigua de `orm.Model` a la nueva API `fmt.Model` definida en `tinywasm/fmt`.
-- Asegurar que la compatibilidad con el paquete central se mantenga luego de los últimos refactores en tinywasm/orm.
+### [Component] Public API Simplification
+#### [MODIFY] adapter.go
+- Rename structs to private (anti-stutter, package is already called `indexdb`):
+  - `IndexDBAdapter` → `adapter`
+  - `IndexDBCompiler` → `compiler`
+- Rename `NewAdapter` → `newAdapter` (private, internal use only).
+- Remove `InitDB` and replace with `New` as the main public constructor, following the `tinywasm/postgres` pattern.
+- `New` must return `*orm.DB` directly, encapsulating the creation of `adapter`, `compiler` and `Initialize`.
+- **Target signature:**
+  ```go
+  func New(dbName string, idg idGenerator, logger func(...any), structTables ...any) *orm.DB
+  ```
 
+#### [MODIFY] execute.go, tx.go
+- Update all references from `IndexDBAdapter` → `adapter`.
+- Make internal functions private (they are implementation details, not part of the public API):
+  - `ProcessRequest` → `processRequest` (tx.go)
+  - `ProcessCursorRequest` → `processCursorRequest` (tx.go)
+  - `MapResult` → `mapResult` (execute.go)
+  - `CheckCondition` → `checkCondition` (execute.go)
+- Update all internal call sites to use the new lowercase names.
+
+### [Component] Remove reflect
+#### [MODIFY] adapter.go
+- Remove the `reflect` import and the reflection-based default factory in `Query()`.
+- The factory must always be provided by the caller (orm). If `args[2]` does not contain a valid factory, return an error instead of falling back to reflect.
+- This reduces WASM binary size and keeps the code explicit.
 
 ### [Component] Tests
-#### [NEW] [bug_integration_test.go](tests/bug_integration_test.go)
-- Implement minimal models to reproduce potential edge cases:
-  ```go
-  type SimpleUser struct {
-      ID    string `db:"pk"`
-      Email string `db:"unique"`
-  }
+#### [MODIFY] tests/setup_test.go
+- Replace `indexdb.InitDB(...)` with `indexdb.New(...)`.
 
-  type SimpleSession struct {
-      ID     string `db:"pk"`
-      UserID string `db:"ref=simple_users"` // Check if reference breaks anything
-  }
+#### [MODIFY] tests/bug_integration_test.go
+- Replace `indexdb.InitDB(...)` with `indexdb.New(...)` in `MultipleInitialization` and `WaitForSuccess`.
 
-  type NumericPK struct {
-      ID    int64  `db:"pk"`
-      Value string
-  }
-  ```
-- **Test cases to implement:**
-  1. **Multiple Initialization:** Call `InitDB` twice on the same database and verify it doesn't crash or duplicate stores.
-  2. **Wait for Success:** Ensure that `Initialize` correctly blocks until the "complete" or "success" event is fired.
-  3. **TEXT Primary Key:** Verify that `ReadOne` works correctly with a `string` ID (both via `get` optimization and cursor fallback).
-  4. **NUMERIC Primary Key:** Verify that `ReadOne` handles `int64` PK correctly.
-  5. **Table Not Found:** Trigger an operation on a non-existent table and verify it returns a clean Go error instead of a JS panic.
-  6. **Cursor Concurrency:** Simulate rapid sequential queries to see if asynchronous events overlap or cause race conditions in the `done` channels.
-  7. **Empty Result Behavior:** Verify `ReadOne` returns `Err("record not found")` consistently when no match exists.
-
-### [Component] Adapter Logic
-#### [MODIFY] [adapter.go](adapter.go) / [execute.go](execute.go)
-- If bugs are found during testing, apply fixes immediately following the "Smallest Change" principle.
-
-## Verification Plan
-
-### Automated Tests
-- Run the full suite using `gotest`:
-```bash
-gotest
-```
-- Focus on the bug integration test:
-```bash
-gotest -run TestBugScenario
-```
+### [Component] Documentation
+#### [MODIFY] README.md
+- Translate the package description (line 5) from Spanish to English.
+- Replace `indexdb.InitDB(...)` with `indexdb.New(...)` in the Go code block under `## Usage`.
+- Update the description below the code block to reflect that `New` is the main constructor and returns `*orm.DB`.
+- Expand the `## Usage` section with a complete example showing:
+  1. Defining a model struct implementing the `tinywasm/fmt` `Model` interface (`ModelName`, `Schema`, `Pointers`).
+  2. Calling `indexdb.New(...)` with a db name, id generator, logger, and model pointers.
+  3. Using the returned `*orm.DB` to call `Create`, `Query`, `ReadOne`, etc.
+- Do not modify the `BADGES_SECTION` (auto-generated by devflow).
+- Do not modify the `Contributing` link.
+- All README content must be in English.

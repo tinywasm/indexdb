@@ -1,4 +1,4 @@
-//go:build js && wasm
+//go:build wasm
 
 package indexdb
 
@@ -11,11 +11,9 @@ import (
 	"github.com/tinywasm/orm"
 )
 
-
 type idGenerator interface {
 	GetNewID() string
 }
-
 
 type IndexDBAdapter struct {
 	dbName string
@@ -51,7 +49,7 @@ func (d *IndexDBAdapter) Exec(query string, args ...any) error {
 
 // simpleScanner implements orm.Scanner
 type simpleScanner struct {
-	err error
+	err  error
 	ptrs []any
 }
 
