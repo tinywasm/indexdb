@@ -3,8 +3,6 @@
 package indexdb
 
 import (
-	"fmt"
-
 	. "github.com/tinywasm/fmt"
 	"github.com/tinywasm/orm"
 )
@@ -16,7 +14,7 @@ type testIDGenerator struct {
 
 func (t *testIDGenerator) GetNewID() string {
 	t.counter++
-	return fmt.Sprintf("%d", t.counter) // Simple ID generation for tests
+	return Sprintf("%d", t.counter) // Simple ID generation for tests
 }
 
 // SetupDB creates a new IndexDB instance for testing
