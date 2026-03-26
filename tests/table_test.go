@@ -5,6 +5,7 @@ package tests_test
 import (
 	"testing"
 
+	. "github.com/tinywasm/fmt"
 	"github.com/tinywasm/indexdb"
 	"github.com/tinywasm/orm"
 )
@@ -126,7 +127,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 
 	// Read All via Cursor
 	var users []User
-	err = db.Query(&User{}).Where("Name").Eq("Bob").ReadAll(func() orm.Model { return &User{} }, func(m orm.Model) {
+	err = db.Query(&User{}).Where("Name").Eq("Bob").ReadAll(func() Model { return &User{} }, func(m Model) {
 		users = append(users, *(m.(*User)))
 	})
 	if err != nil {

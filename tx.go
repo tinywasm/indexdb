@@ -1,4 +1,4 @@
-//go:build js && wasm
+//go:build wasm
 
 package indexdb
 
@@ -103,23 +103,18 @@ func ProcessCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error
 
 // Transaction helper to start a transaction and get the object store.
 // mode should be "readonly" or "readwrite".
-func (d *IndexDBAdapter) getStore(tableName string, mode string) (js.Value, error) {
+func (d *IndexDBAdapter) getStore(tableName string, mode string) (store js.Value, err error) {
 	if !d.db.Truthy() {
 		return js.Value{}, Err("Database not initialized")
 	}
 
-	// Create transaction
-	// Note: We are creating a new transaction for each operation here as per the Adapter pattern (stateless execution).
-	// In a more complex ORM usage, we might want to reuse transactions, but orm.Adapter Execute is usually atomic per query.
-
-	// 'transaction' method returns a transaction object immediately.
-	// It might throw an exception if the table doesn't exist.
-	// We should probably recover from panic if syscall/js panics on exception, but syscall/js usually returns error on Call?
-	// Actually syscall/js Call panics if the function throws.
-	// So we need to be careful. However, we checked table existence in InitDB theoretically.
-
-	// A safer way would be to wrap in a recover block if we suspect invalid table names.
-	// For now, we assume ORM passes valid table names.
+	// IndexedDB's transaction() method throws an exception if the object store doesn't exist.
+	// In Go WebAssembly, JS exceptions cause a panic, so we must recover and return an error.
+	defer func() {
+		if r := recover(); r != nil {
+			err = Errf("Object store %s not found: %v", tableName, r)
+		}
+	}()
 
 	tx := d.db.Call("transaction", tableName, mode)
 
@@ -127,7 +122,7 @@ func (d *IndexDBAdapter) getStore(tableName string, mode string) (js.Value, erro
 		return js.Value{}, Errf("Failed to create transaction for table %s", tableName)
 	}
 
-	store := tx.Call("objectStore", tableName)
+	store = tx.Call("objectStore", tableName)
 	if !store.Truthy() {
 		return js.Value{}, Errf("Failed to get object store for table %s", tableName)
 	}

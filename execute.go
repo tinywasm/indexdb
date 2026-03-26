@@ -10,7 +10,7 @@ import (
 )
 
 // Execute implements orm.Adapter for IndexDB.
-func (d *IndexDBAdapter) Execute(q orm.Query, m orm.Model, factory func() orm.Model, each func(orm.Model)) error {
+func (d *IndexDBAdapter) Execute(q orm.Query, m Model, factory func() Model, each func(Model)) error {
 	switch q.Action {
 	case orm.ActionCreate:
 		return d.create(q, m)
@@ -27,7 +27,7 @@ func (d *IndexDBAdapter) Execute(q orm.Query, m orm.Model, factory func() orm.Mo
 	}
 }
 
-func (d *IndexDBAdapter) create(q orm.Query, m orm.Model) error {
+func (d *IndexDBAdapter) create(q orm.Query, m Model) error {
 	// Establish a "readwrite" transaction block directed at the store mapped via q.Table.
 	store, err := d.getStore(q.Table, "readwrite")
 	if err != nil {
@@ -46,7 +46,7 @@ func (d *IndexDBAdapter) create(q orm.Query, m orm.Model) error {
 	return err
 }
 
-func (d *IndexDBAdapter) update(q orm.Query, m orm.Model) error {
+func (d *IndexDBAdapter) update(q orm.Query, m Model) error {
 	// Establish a "readwrite" transaction block directed at the store mapped via q.Table.
 	store, err := d.getStore(q.Table, "readwrite")
 	if err != nil {
@@ -65,7 +65,7 @@ func (d *IndexDBAdapter) update(q orm.Query, m orm.Model) error {
 	return err
 }
 
-func (d *IndexDBAdapter) delete(q orm.Query, m orm.Model) error {
+func (d *IndexDBAdapter) delete(q orm.Query, m Model) error {
 	store, err := d.getStore(q.Table, "readwrite")
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func (d *IndexDBAdapter) delete(q orm.Query, m orm.Model) error {
 	return Err("delete requires a single equality condition on the primary key")
 }
 
-func (d *IndexDBAdapter) readOne(q orm.Query, m orm.Model) error {
+func (d *IndexDBAdapter) readOne(q orm.Query, m Model) error {
 	store, err := d.getStore(q.Table, "readonly")
 	if err != nil {
 		return err
@@ -138,7 +138,7 @@ func (d *IndexDBAdapter) readOne(q orm.Query, m orm.Model) error {
 	return nil
 }
 
-func (d *IndexDBAdapter) readAll(q orm.Query, factory func() orm.Model, each func(orm.Model)) error {
+func (d *IndexDBAdapter) readAll(q orm.Query, factory func() Model, each func(Model)) error {
 	store, err := d.getStore(q.Table, "readonly")
 	if err != nil {
 		return err
@@ -178,7 +178,7 @@ func (d *IndexDBAdapter) readAll(q orm.Query, factory func() orm.Model, each fun
 }
 
 // MapResult maps a JS value to a Model's pointers
-func MapResult(val js.Value, m orm.Model) error {
+func MapResult(val js.Value, m Model) error {
 	fields := m.Schema()
 	ptrs := m.Pointers()
 
@@ -190,25 +190,25 @@ func MapResult(val js.Value, m orm.Model) error {
 
 		ptr := ptrs[i]
 		switch field.Type {
-		case orm.TypeText:
+		case FieldText:
 			if p, ok := ptr.(*string); ok {
 				*p = jsVal.String()
 			}
-		case orm.TypeInt64:
+		case FieldInt:
 			if p, ok := ptr.(*int64); ok {
 				*p = int64(jsVal.Int())
 			} else if p, ok := ptr.(*int); ok {
 				*p = jsVal.Int()
 			}
-		case orm.TypeFloat64:
+		case FieldFloat:
 			if p, ok := ptr.(*float64); ok {
 				*p = jsVal.Float()
 			}
-		case orm.TypeBool:
+		case FieldBool:
 			if p, ok := ptr.(*bool); ok {
 				*p = jsVal.Bool()
 			}
-		case orm.TypeBlob:
+		case FieldBlob:
 			// []byte from Uint8Array if needed — skip for now, not used in indexdb
 		}
 	}

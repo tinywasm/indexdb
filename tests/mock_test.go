@@ -6,6 +6,7 @@ import (
 	"syscall/js"
 	"testing"
 
+	. "github.com/tinywasm/fmt"
 	"github.com/tinywasm/indexdb"
 	"github.com/tinywasm/orm"
 )
@@ -19,16 +20,16 @@ type FakeModel struct {
 	Blob  []byte
 }
 
-func (m *FakeModel) TableName() string { return "fake" }
-func (m *FakeModel) Schema() []orm.Field {
-	return []orm.Field{
-		{Name: "ID", Type: orm.TypeText, Constraints: orm.ConstraintPK},
-		{Name: "Score", Type: orm.TypeFloat64},
-		{Name: "Age", Type: orm.TypeInt64},
-		{Name: "Valid", Type: orm.TypeBool},
-		{Name: "Time", Type: orm.TypeInt64},
-		{Name: "Blob", Type: orm.TypeBlob},
-		{Name: "Missing", Type: orm.TypeText},
+func (m *FakeModel) ModelName() string { return "fake" }
+func (m *FakeModel) Schema() []Field {
+	return []Field{
+		{Name: "ID", Type: FieldText, PK: true},
+		{Name: "Score", Type: FieldFloat},
+		{Name: "Age", Type: FieldInt},
+		{Name: "Valid", Type: FieldBool},
+		{Name: "Time", Type: FieldInt},
+		{Name: "Blob", Type: FieldBlob},
+		{Name: "Missing", Type: FieldText},
 	}
 }
 func (m *FakeModel) Values() []any {
@@ -171,9 +172,9 @@ func TestExecuteDefaultAction(t *testing.T) {
 
 type UnknownTable struct{}
 
-func (u *UnknownTable) TableName() string { return "unknown_table" }
-func (u *UnknownTable) Schema() []orm.Field {
-	return []orm.Field{{Name: "id", Type: orm.TypeText, Constraints: orm.ConstraintPK}}
+func (u *UnknownTable) ModelName() string { return "unknown_table" }
+func (u *UnknownTable) Schema() []Field {
+	return []Field{{Name: "id", Type: FieldText, PK: true}}
 }
 func (u *UnknownTable) Values() []any   { return []any{} }
 func (u *UnknownTable) Pointers() []any { return []any{} }
