@@ -8,9 +8,9 @@ import (
 	. "github.com/tinywasm/fmt"
 )
 
-// ProcessRequest handles an IndexedDB request (like add, put, get, delete)
+// processRequest handles an IndexedDB request (like add, put, get, delete)
 // and returns the result or error via channels.
-func ProcessRequest(req js.Value) (js.Value, error) {
+func processRequest(req js.Value) (js.Value, error) {
 	done := make(chan struct{})
 	var result js.Value
 	var err error
@@ -44,9 +44,9 @@ func ProcessRequest(req js.Value) (js.Value, error) {
 	return result, err
 }
 
-// ProcessCursorRequest handles an IndexedDB cursor request (openCursor).
+// processCursorRequest handles an IndexedDB cursor request (openCursor).
 // It iterates over the cursor and calls the provided callback for each item.
-func ProcessCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error {
+func processCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error {
 	done := make(chan struct{})
 	var err error
 
@@ -103,7 +103,7 @@ func ProcessCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error
 
 // Transaction helper to start a transaction and get the object store.
 // mode should be "readonly" or "readwrite".
-func (d *IndexDBAdapter) getStore(tableName string, mode string) (store js.Value, err error) {
+func (d *adapter) getStore(tableName string, mode string) (store js.Value, err error) {
 	if !d.db.Truthy() {
 		return js.Value{}, Err("Database not initialized")
 	}

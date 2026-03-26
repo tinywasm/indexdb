@@ -1,23 +1,20 @@
 //go:build wasm
 
-package tests_test
+package indexdb
 
 import (
-	"fmt"
-
 	. "github.com/tinywasm/fmt"
-	"github.com/tinywasm/indexdb"
 	"github.com/tinywasm/orm"
 )
 
-// idGenerator implements the idGenerator interface for testing
-type idGenerator struct {
+// testIDGenerator implements the idGenerator interface for testing
+type testIDGenerator struct {
 	counter int
 }
 
-func (t *idGenerator) GetNewID() string {
+func (t *testIDGenerator) GetNewID() string {
 	t.counter++
-	return fmt.Sprintf("%d", t.counter) // Simple ID generation for tests
+	return Sprintf("%d", t.counter) // Simple ID generation for tests
 }
 
 // SetupDB creates a new IndexDB instance for testing
@@ -29,10 +26,10 @@ func SetupDB(logger func(...any), dbName string, structTables ...any) *orm.DB {
 	}
 
 	// Create a test ID generator
-	idGen := &idGenerator{}
+	idGen := &testIDGenerator{}
 
 	// Call the new primary constructor
-	db := indexdb.New(testDbName, idGen, logger, structTables...)
+	db := New(testDbName, idGen, logger, structTables...)
 
 	return db
 }
