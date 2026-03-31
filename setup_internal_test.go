@@ -45,7 +45,7 @@ type User struct {
 func (u *User) ModelName() string { return "user" }
 func (u *User) Schema() []Field {
 	return []Field{
-		{Name: "ID", Type: FieldText, PK: true},
+		{Name: "ID", Type: FieldText, DB: &FieldDB{PK: true}},
 		{Name: "Name", Type: FieldText},
 		{Name: "Email", Type: FieldText},
 	}
@@ -64,7 +64,7 @@ type Product struct {
 func (p *Product) ModelName() string { return "product" }
 func (p *Product) Schema() []Field {
 	return []Field{
-		{Name: "IDProduct", Type: FieldText, PK: true},
+		{Name: "IDProduct", Type: FieldText, DB: &FieldDB{PK: true}},
 		{Name: "Name", Type: FieldText},
 		{Name: "Price", Type: FieldFloat},
 	}

@@ -18,8 +18,8 @@ type SimpleUser struct {
 func (m *SimpleUser) ModelName() string { return "simple_users" }
 func (m *SimpleUser) Schema() []Field {
 	return []Field{
-		{Name: "ID", Type: FieldText, PK: true},
-		{Name: "Email", Type: FieldText, Unique: true},
+		{Name: "ID", Type: FieldText, DB: &FieldDB{PK: true}},
+		{Name: "Email", Type: FieldText, DB: &FieldDB{Unique: true}},
 	}
 }
 func (m *SimpleUser) Pointers() []any { return []any{&m.ID, &m.Email} }
@@ -33,7 +33,7 @@ type SimpleSession struct {
 func (m *SimpleSession) ModelName() string { return "simple_sessions" }
 func (m *SimpleSession) Schema() []Field {
 	return []Field{
-		{Name: "ID", Type: FieldText, PK: true},
+		{Name: "ID", Type: FieldText, DB: &FieldDB{PK: true}},
 		{Name: "UserID", Type: FieldText},
 	}
 }
@@ -48,7 +48,7 @@ type NumericPK struct {
 func (m *NumericPK) ModelName() string { return "numeric_pks" }
 func (m *NumericPK) Schema() []Field {
 	return []Field{
-		{Name: "ID", Type: FieldInt, PK: true},
+		{Name: "ID", Type: FieldInt, DB: &FieldDB{PK: true}},
 		{Name: "Value", Type: FieldText},
 	}
 }

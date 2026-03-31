@@ -369,7 +369,7 @@ func (d *adapter) createTable(m Model) error {
 
 	pkName := ""
 	for _, f := range fields {
-		if f.PK {
+		if f.IsPK() {
 			pkName = f.Name
 			break
 		}
@@ -380,7 +380,7 @@ func (d *adapter) createTable(m Model) error {
 
 	autoIncrement := false
 	for _, f := range fields {
-		if f.AutoInc {
+		if f.IsAutoInc() {
 			autoIncrement = true
 			break
 		}
@@ -396,7 +396,7 @@ func (d *adapter) createTable(m Model) error {
 		if f.Name == pkName {
 			continue
 		}
-		newStore.Call("createIndex", f.Name, f.Name, map[string]interface{}{"unique": f.Unique})
+		newStore.Call("createIndex", f.Name, f.Name, map[string]interface{}{"unique": f.IsUnique()})
 	}
 	return nil
 }

@@ -22,7 +22,7 @@ type FakeModel struct {
 func (m *FakeModel) ModelName() string { return "fake" }
 func (m *FakeModel) Schema() []Field {
 	return []Field{
-		{Name: "ID", Type: FieldText, PK: true},
+		{Name: "ID", Type: FieldText, DB: &FieldDB{PK: true}},
 		{Name: "Score", Type: FieldFloat},
 		{Name: "Age", Type: FieldInt},
 		{Name: "Valid", Type: FieldBool},
@@ -173,7 +173,7 @@ type UnknownTable struct{}
 
 func (u *UnknownTable) ModelName() string { return "unknown_table" }
 func (u *UnknownTable) Schema() []Field {
-	return []Field{{Name: "id", Type: FieldText, PK: true}}
+	return []Field{{Name: "id", Type: FieldText, DB: &FieldDB{PK: true}}}
 }
 func (u *UnknownTable) Values() []any   { return []any{} }
 func (u *UnknownTable) Pointers() []any { return []any{} }
