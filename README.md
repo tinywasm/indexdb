@@ -35,9 +35,9 @@ type User struct {
 func (u *User) ModelName() string { return "users" }
 func (u *User) Schema() []indexdb.Field {
 	return []indexdb.Field{
-		{Name: "ID", Type: indexdb.FieldText, PK: true},
+		{Name: "ID", Type: indexdb.FieldText, DB: &indexdb.FieldDB{PK: true}},
 		{Name: "Name", Type: indexdb.FieldText},
-		{Name: "Email", Type: indexdb.FieldText, Unique: true},
+		{Name: "Email", Type: indexdb.FieldText, DB: &indexdb.FieldDB{Unique: true}},
 	}
 }
 func (u *User) Pointers() []any { return []any{&u.ID, &u.Name, &u.Email} }
