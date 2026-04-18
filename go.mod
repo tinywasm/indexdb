@@ -4,4 +4,4 @@ go 1.25.2
 
 require github.com/tinywasm/fmt v0.23.4
 
-require github.com/tinywasm/orm v0.7.5
+require github.com/tinywasm/orm v0.8.0
