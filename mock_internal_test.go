@@ -160,9 +160,7 @@ func TestCheckConditionOperators(t *testing.T) {
 }
 
 func TestExecuteDefaultAction(t *testing.T) {
-	logger := func(args ...any) { t.Log(args...) }
-
-	adapter := newAdapter("test_db", nil, logger)
+	adapter := newAdapter("test_db", nil, nil)
 	err := adapter.execute(orm.Query{Action: 999}, nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unimplemented action")
@@ -179,10 +177,8 @@ func (u *UnknownTable) Values() []any   { return []any{} }
 func (u *UnknownTable) Pointers() []any { return []any{} }
 
 func TestExecuteActionNotImplemented(t *testing.T) {
-	logger := func(args ...any) { t.Log(args...) }
-
 	// Create adapter directly to test execute default case
-	adapter := newAdapter("test_db", nil, logger)
+	adapter := newAdapter("test_db", nil, nil)
 	err := adapter.execute(orm.Query{Action: 999}, nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unimplemented action")
@@ -253,12 +249,12 @@ func TestProcessRequests(t *testing.T) {
 	})
 	_, err := processRequest(dummyReq)
 	if err == nil {
-		t.Log("Expected error on mocked request")
+		t.Error("Expected error on mocked request, got nil")
 	}
 
 	err = processCursorRequest(dummyReq, func(c js.Value) bool { return false })
 	if err == nil {
-		t.Log("Expected error on mocked cursor")
+		t.Error("Expected error on mocked cursor, got nil")
 	}
 }
 

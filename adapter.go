@@ -238,9 +238,7 @@ func (d *adapter) Close() error {
 // newAdapter creates a new adapter.
 func newAdapter(dbName string, idg idGenerator, logger func(...any)) *adapter {
 	if logger == nil {
-		logger = func(args ...any) {
-			Println(args...)
-		}
+		logger = func(args ...any) {}
 	}
 
 	return &adapter{

@@ -31,7 +31,7 @@ func processRequest(req js.Value) (js.Value, error) {
 		if errVal.Truthy() {
 			errMsg = errVal.Get("message").String()
 		}
-		err = Errf("IndexedDB request failed: %s", errMsg)
+		err = Err("IndexedDB request failed:", errMsg)
 		close(done)
 		return nil
 	})
@@ -83,7 +83,7 @@ func processCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error
 		if errVal.Truthy() {
 			errMsg = errVal.Get("message").String()
 		}
-		err = Errf("IndexedDB cursor failed: %s", errMsg)
+		err = Err("IndexedDB cursor failed:", errMsg)
 		// Only close done on error if not already closed
 		select {
 		case <-done:
@@ -103,28 +103,27 @@ func processCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error
 
 // Transaction helper to start a transaction and get the object store.
 // mode should be "readonly" or "readwrite".
-func (d *adapter) getStore(tableName string, mode string) (store js.Value, err error) {
+func (d *adapter) getStore(tableName string, mode string) (js.Value, error) {
 	if !d.db.Truthy() {
 		return js.Value{}, Err("Database not initialized")
 	}
 
-	// IndexedDB's transaction() method throws an exception if the object store doesn't exist.
-	// In Go WebAssembly, JS exceptions cause a panic, so we must recover and return an error.
-	defer func() {
-		if r := recover(); r != nil {
-			err = Errf("Object store %s not found: %v", tableName, r)
-		}
-	}()
-
-	tx := d.db.Call("transaction", tableName, mode)
-
-	if !tx.Truthy() {
-		return js.Value{}, Errf("Failed to create transaction for table %s", tableName)
+	// Pre-check object store existence. Calling transaction() with an unknown
+	// store throws a NotFoundError, which is unrecoverable under TinyGo wasm
+	// (recover() not supported on this target — see tinygo.org/docs/reference/lang-support).
+	storeNames := d.db.Get("objectStoreNames")
+	if !storeNames.Truthy() || !storeNames.Call("contains", tableName).Bool() {
+		return js.Value{}, Err("Object store", tableName, "not found")
 	}
 
-	store = tx.Call("objectStore", tableName)
+	tx := d.db.Call("transaction", tableName, mode)
+	if !tx.Truthy() {
+		return js.Value{}, Err("Failed to create transaction for table", tableName)
+	}
+
+	store := tx.Call("objectStore", tableName)
 	if !store.Truthy() {
-		return js.Value{}, Errf("Failed to get object store for table %s", tableName)
+		return js.Value{}, Err("Failed to get object store for table", tableName)
 	}
 
 	return store, nil
