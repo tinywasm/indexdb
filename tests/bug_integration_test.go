@@ -55,15 +55,13 @@ func (m *NumericPK) Schema() []Field {
 func (m *NumericPK) Pointers() []any { return []any{&m.ID, &m.Value} }
 
 func TestBugScenario(t *testing.T) {
-	logger := func(args ...any) { t.Log(args...) }
-
 	t.Run("MultipleInitialization", func(t *testing.T) {
 		dbName := "multi_init_test"
-		db1 := indexdb.New(dbName, nil, logger, &SimpleUser{})
+		db1 := indexdb.New(dbName, nil, nil, &SimpleUser{})
 		_ = db1
 
 		// Initialize again
-		db2 := indexdb.New(dbName, nil, logger, &SimpleUser{})
+		db2 := indexdb.New(dbName, nil, nil, &SimpleUser{})
 		if db2 == nil {
 			t.Fatal("Second initialization failed")
 		}
@@ -73,7 +71,7 @@ func TestBugScenario(t *testing.T) {
 		dbName := "wait_success_test"
 		// This test is implicit because New blocks until initDone is closed.
 		// If it doesn't block, subsequent operations would fail.
-		db := indexdb.New(dbName, nil, logger, &SimpleUser{})
+		db := indexdb.New(dbName, nil, nil, &SimpleUser{})
 
 		err := db.Create(&SimpleUser{ID: "u1", Email: "u1@test.com"})
 		if err != nil {
@@ -82,7 +80,7 @@ func TestBugScenario(t *testing.T) {
 	})
 
 	t.Run("TextPK", func(t *testing.T) {
-		db := SetupDB(logger, "text_pk_test", &SimpleUser{})
+		db := SetupDB(nil, "text_pk_test", &SimpleUser{})
 		u := SimpleUser{ID: "alice", Email: "alice@test.com"}
 
 		if err := db.Create(&u); err != nil {
@@ -100,7 +98,7 @@ func TestBugScenario(t *testing.T) {
 	})
 
 	t.Run("NumericPK", func(t *testing.T) {
-		db := SetupDB(logger, "numeric_pk_test", &NumericPK{})
+		db := SetupDB(nil, "numeric_pk_test", &NumericPK{})
 		n := NumericPK{ID: 123, Value: "test"}
 
 		if err := db.Create(&n); err != nil {
@@ -118,18 +116,17 @@ func TestBugScenario(t *testing.T) {
 	})
 
 	t.Run("TableNotFound", func(t *testing.T) {
-		db := SetupDB(logger, "table_not_found_test", &SimpleUser{})
+		db := SetupDB(nil, "table_not_found_test", &SimpleUser{})
 
 		var session SimpleSession
 		err := db.Query(&session).Where("ID").Eq("s1").ReadOne()
 		if err == nil {
 			t.Fatal("Expected error for non-existent table, got nil")
 		}
-		t.Logf("Received expected error: %v", err)
 	})
 
 	t.Run("CursorConcurrency", func(t *testing.T) {
-		db := SetupDB(logger, "concurrency_test", &SimpleUser{})
+		db := SetupDB(nil, "concurrency_test", &SimpleUser{})
 
 		// Seed some data
 		for i := 0; i < 10; i++ {
@@ -147,7 +144,7 @@ func TestBugScenario(t *testing.T) {
 	})
 
 	t.Run("EmptyResult", func(t *testing.T) {
-		db := SetupDB(logger, "empty_result_test", &SimpleUser{})
+		db := SetupDB(nil, "empty_result_test", &SimpleUser{})
 
 		var u SimpleUser
 		err := db.Query(&u).Where("ID").Eq("missing").ReadOne()

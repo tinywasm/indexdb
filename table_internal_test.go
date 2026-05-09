@@ -12,12 +12,8 @@ import (
 // TestIndexDBCrudOperations tests basic CRUD operations in IndexDB
 func TestIndexDBCrudOperations(t *testing.T) {
 
-	logger := func(args ...any) {
-		t.Log(args...)
-	}
-
 	// Setup the database with tables
-	db := SetupDB(logger, "", &User{}, &Product{})
+	db := SetupDB(nil, "", &User{}, &Product{})
 
 	// Tables should be implicitly created by New during SetupDB.
 	// We no longer manually test TableExist here because the ORM wrapper handles it via adapter.
@@ -76,10 +72,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	}
 
 	// Delete on non-existent
-	err = db.Delete(&User{ID: "999999"}, orm.Eq("ID", "999999"))
-	if err != nil {
-		t.Logf("Delete non-existent returned error: %v", err)
-	}
+	_ = db.Delete(&User{ID: "999999"}, orm.Eq("ID", "999999"))
 
 	// Delete multi-condition
 	err = db.Delete(&User{ID: "1"}, orm.Eq("ID", "1"), orm.Eq("Name", "Alice"))
@@ -89,10 +82,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 
 	// ReadOne via cursor path (no single PK condition)
 	var alice User
-	err = db.Query(&alice).Where("Name").Eq("Alice").ReadOne()
-	if err != nil {
-		t.Logf("ReadOne by name returned: %v", err)
-	}
+	_ = db.Query(&alice).Where("Name").Eq("Alice").ReadOne()
 
 	// Create and read by non-PK to find it
 	db.Create(&User{ID: "bob_id", Name: "Bob", Email: "bob@domain.com"})
@@ -123,8 +113,7 @@ func TestIndexDBCrudOperations(t *testing.T) {
 
 // Test close execution branch
 func TestCloseDb(t *testing.T) {
-	logger := func(args ...any) {}
-	db := SetupDB(logger, "close_db", &User{})
+	db := SetupDB(nil, "close_db", &User{})
 	// Assuming raw executor handles Close
 	_ = db.Close()
 	// Should not panic
@@ -133,7 +122,7 @@ func TestCloseDb(t *testing.T) {
 // Extra coverage for tableExist
 func TestTableExist(t *testing.T) {
 	// Let's use SetupDB normally
-	db := SetupDB(t.Log, "exist_db", &User{})
+	db := SetupDB(nil, "exist_db", &User{})
 	// Try accessing raw adapter via db.RawExecutor
 	raw := db.RawExecutor()
 	if raw != nil {
@@ -152,7 +141,7 @@ func TestTableExist(t *testing.T) {
 
 // Extra ReadAll edge cases
 func TestReadAllEdgeCases(t *testing.T) {
-	db := SetupDB(t.Log, "readall_edge", &User{})
+	db := SetupDB(nil, "readall_edge", &User{})
 
 	db.Create(&User{ID: "edge1", Name: "Edge1"})
 }

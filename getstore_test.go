@@ -13,7 +13,7 @@ func TestGetStore_ExistingTable_Succeeds(t *testing.T) {
 	// Ensure a fresh database for this test
 	js.Global().Get("indexedDB").Call("deleteDatabase", dbName)
 
-	db := SetupDB(t.Log, dbName, &User{})
+	db := SetupDB(nil, dbName, &User{})
 	defer db.Close()
 
 	// Get the adapter from the orm.DB
@@ -35,7 +35,7 @@ func TestGetStore_MissingTable_ReturnsError(t *testing.T) {
 	// Ensure a fresh database for this test
 	js.Global().Get("indexedDB").Call("deleteDatabase", dbName)
 
-	db := SetupDB(t.Log, dbName, &User{})
+	db := SetupDB(nil, dbName, &User{})
 	defer db.Close()
 
 	adapter := db.RawExecutor().(*adapter)
@@ -78,7 +78,7 @@ func TestGetStore_NoCrash_OnMissingTable(t *testing.T) {
 	// Ensure a fresh database for this test
 	js.Global().Get("indexedDB").Call("deleteDatabase", dbName)
 
-	db := SetupDB(t.Log, dbName, &User{})
+	db := SetupDB(nil, dbName, &User{})
 	defer db.Close()
 
 	adapter := db.RawExecutor().(*adapter)
