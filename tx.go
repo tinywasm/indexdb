@@ -8,42 +8,6 @@ import (
 	. "github.com/tinywasm/fmt"
 )
 
-// processRequest handles an IndexedDB request (like add, put, get, delete)
-// and returns the result or error via channels.
-func processRequest(req js.Value) (js.Value, error) {
-	done := make(chan struct{})
-	var result js.Value
-	var err error
-
-	// We need to define callbacks outside to be able to reference them if needed
-	// or simply to keep code clean.
-
-	onSuccess := js.FuncOf(func(this js.Value, args []js.Value) any {
-		result = req.Get("result")
-		close(done)
-		return nil
-	})
-	defer onSuccess.Release()
-
-	onError := js.FuncOf(func(this js.Value, args []js.Value) any {
-		errVal := req.Get("error")
-		errMsg := "Unknown IndexedDB error"
-		if errVal.Truthy() {
-			errMsg = errVal.Get("message").String()
-		}
-		err = Err("IndexedDB request failed:", errMsg)
-		close(done)
-		return nil
-	})
-	defer onError.Release()
-
-	req.Call("addEventListener", "success", onSuccess)
-	req.Call("addEventListener", "error", onError)
-
-	<-done
-	return result, err
-}
-
 // processCursorRequest handles an IndexedDB cursor request (openCursor).
 // It iterates over the cursor and calls the provided callback for each item.
 func processCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error {

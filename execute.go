@@ -5,6 +5,8 @@ package indexdb
 import (
 	"syscall/js"
 
+	"github.com/tinywasm/jsvalue"
+
 	. "github.com/tinywasm/fmt"
 	"github.com/tinywasm/orm"
 )
@@ -42,7 +44,7 @@ func (d *adapter) create(q orm.Query, m Model) error {
 
 	// Deploy store.add() and explicitly await its resolution event.
 	req := store.Call("add", data)
-	_, err = processRequest(req)
+	_, err = jsvalue.AwaitRequest(req)
 	return err
 }
 
@@ -61,7 +63,7 @@ func (d *adapter) update(q orm.Query, m Model) error {
 
 	// Deploy store.put() and explicitly await its resolution event.
 	req := store.Call("put", data)
-	_, err = processRequest(req)
+	_, err = jsvalue.AwaitRequest(req)
 	return err
 }
 
@@ -74,7 +76,7 @@ func (d *adapter) delete(q orm.Query, m Model) error {
 	if len(q.Conditions) == 1 && q.Conditions[0].Operator() == "=" {
 		pkValue := q.Conditions[0].Value()
 		req := store.Call("delete", pkValue)
-		_, err = processRequest(req)
+		_, err = jsvalue.AwaitRequest(req)
 		return err
 	}
 
@@ -92,7 +94,7 @@ func (d *adapter) readOne(q orm.Query, m Model) error {
 	if len(q.Conditions) == 1 && q.Conditions[0].Operator() == "=" {
 		key := q.Conditions[0].Value()
 		req := store.Call("get", key)
-		result, err := processRequest(req)
+		result, err := jsvalue.AwaitRequest(req)
 		if err == nil && result.Truthy() {
 			return mapResult(result, m)
 		}

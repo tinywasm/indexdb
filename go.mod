@@ -5,3 +5,5 @@ go 1.25.2
 require github.com/tinywasm/fmt v0.23.9
 
 require github.com/tinywasm/orm v0.8.1
+
+require github.com/tinywasm/jsvalue v0.0.11

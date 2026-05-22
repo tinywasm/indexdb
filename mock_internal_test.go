@@ -6,6 +6,8 @@ import (
 	"syscall/js"
 	"testing"
 
+	"github.com/tinywasm/jsvalue"
+
 	. "github.com/tinywasm/fmt"
 	"github.com/tinywasm/orm"
 )
@@ -233,7 +235,7 @@ func TestProcessRequests(t *testing.T) {
 			if len(args) > 1 && args[0].String() == "error" {
 				cb := args[1]
 				// It expects to be called as a DOM event where 'target' has error,
-				// but our processRequest looks at req.Get("error") so we can just set it on our mock req
+				// but our jsvalue.AwaitRequest looks at req.Get("error") so we can just set it on our mock req
 				dummyThis := js.ValueOf(map[string]any{
 					"error": map[string]any{
 						"message": "simulated obj error",
@@ -247,7 +249,7 @@ func TestProcessRequests(t *testing.T) {
 			"message": "mock message",
 		},
 	})
-	_, err := processRequest(dummyReq)
+	_, err := jsvalue.AwaitRequest(dummyReq)
 	if err == nil {
 		t.Error("Expected error on mocked request, got nil")
 	}
