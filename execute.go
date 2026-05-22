@@ -192,28 +192,8 @@ func mapResult(val js.Value, m Model) error {
 			continue
 		}
 
-		ptr := ptrs[i]
-		switch field.Type {
-		case FieldText:
-			if p, ok := ptr.(*string); ok {
-				*p = jsVal.String()
-			}
-		case FieldInt:
-			if p, ok := ptr.(*int64); ok {
-				*p = int64(jsVal.Int())
-			} else if p, ok := ptr.(*int); ok {
-				*p = jsVal.Int()
-			}
-		case FieldFloat:
-			if p, ok := ptr.(*float64); ok {
-				*p = jsVal.Float()
-			}
-		case FieldBool:
-			if p, ok := ptr.(*bool); ok {
-				*p = jsVal.Bool()
-			}
-		case FieldBlob:
-			// []byte from Uint8Array if needed — skip for now, not used in indexdb
+		if err := jsvalue.ScanValue(jsVal, ptrs[i]); err != nil {
+			return err
 		}
 	}
 	return nil
