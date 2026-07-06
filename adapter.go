@@ -7,6 +7,7 @@ import (
 	"syscall/js"
 
 	. "github.com/tinywasm/fmt"
+	. "github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 )
 
@@ -169,6 +170,14 @@ func (r *simpleRows) Scan(dest ...any) error {
 	}
 
 	return nil
+}
+
+func (r *simpleRows) Columns() ([]string, error) {
+	cols := make([]string, len(r.fields))
+	for i, f := range r.fields {
+		cols[i] = f.Name
+	}
+	return cols, nil
 }
 
 func (r *simpleRows) Close() error { return nil }

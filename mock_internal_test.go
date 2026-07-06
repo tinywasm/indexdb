@@ -8,7 +8,7 @@ import (
 
 	"github.com/tinywasm/jsvalue"
 
-	. "github.com/tinywasm/fmt"
+	. "github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 )
 

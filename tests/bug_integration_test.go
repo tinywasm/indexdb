@@ -5,8 +5,8 @@ package tests_test
 import (
 	"testing"
 
-	. "github.com/tinywasm/fmt"
 	"github.com/tinywasm/indexdb"
+	. "github.com/tinywasm/model"
 )
 
 // SimpleUser implements the Model interface for testing

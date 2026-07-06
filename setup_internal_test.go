@@ -4,6 +4,7 @@ package indexdb
 
 import (
 	. "github.com/tinywasm/fmt"
+	. "github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 )
 

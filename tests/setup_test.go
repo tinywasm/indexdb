@@ -5,8 +5,8 @@ package tests_test
 import (
 	"fmt"
 
-	. "github.com/tinywasm/fmt"
 	"github.com/tinywasm/indexdb"
+	. "github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 )
 
