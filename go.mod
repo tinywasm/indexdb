@@ -8,5 +8,5 @@ require github.com/tinywasm/orm v0.9.22
 
 require (
 	github.com/tinywasm/jsvalue v0.0.14
-	github.com/tinywasm/model v0.0.3
+	github.com/tinywasm/model v0.0.4
 )
