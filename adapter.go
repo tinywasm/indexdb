@@ -12,7 +12,7 @@ import (
 )
 
 type idGenerator interface {
-	GetNewID() string
+	NewID() string
 }
 
 type adapter struct {
@@ -431,7 +431,7 @@ func (d *adapter) tableExist(tableName string) bool {
 // getNewID helper to access the ID generator
 func (d *adapter) getNewID() string {
 	if d.idGen != nil {
-		return d.idGen.GetNewID()
+		return d.idGen.NewID()
 	}
 	return ""
 }

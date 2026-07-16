@@ -15,7 +15,7 @@ type idGenerator struct {
 	counter int
 }
 
-func (t *idGenerator) GetNewID() string {
+func (t *idGenerator) NewID() string {
 	t.counter++
 	return fmt.Sprintf("%d", t.counter) // Simple ID generation for tests
 }

@@ -13,7 +13,7 @@ type testIDGenerator struct {
 	counter int
 }
 
-func (t *testIDGenerator) GetNewID() string {
+func (t *testIDGenerator) NewID() string {
 	t.counter++
 	return Sprintf("%d", t.counter) // Simple ID generation for tests
 }
