@@ -6,48 +6,46 @@ import (
 	"sync"
 	"syscall/js"
 
-	. "github.com/tinywasm/fmt"
+	"github.com/tinywasm/fmt"
 	. "github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
+	"github.com/tinywasm/storage"
 )
-
-type idGenerator interface {
-	NewID() string
-}
 
 type adapter struct {
 	dbName string
 	db     js.Value
 	tables []any
 	logger func(...any)
-	idGen  idGenerator
+	idGen  IDGenerator
+
+	compiler *compiler
 
 	initDone      chan struct{}
 	initOnce      sync.Once
 	initCompleted bool
 }
 
-// Exec implements orm.Executor
+// Exec implements storage.Executor
 func (d *adapter) Exec(query string, args ...any) error {
 	if len(args) == 0 {
-		return Err("no query passed")
+		return fmt.Err("no query passed")
 	}
-	q, ok := args[0].(orm.Query)
+	q, ok := args[0].(storage.Query)
 	if !ok {
-		return Err("invalid query type")
+		return fmt.Err("invalid query type")
 	}
 	if len(args) < 2 {
-		return Err("missing model argument")
+		return fmt.Err("missing model argument")
 	}
 	m, ok := args[1].(Model)
 	if !ok {
-		return Err("invalid model type")
+		return fmt.Err("invalid model type")
 	}
 
 	return d.execute(q, m, nil, nil, nil)
 }
 
-// simpleScanner implements orm.Scanner
+// simpleScanner implements storage.Scanner
 type simpleScanner struct {
 	err  error
 	ptrs []any
@@ -60,28 +58,28 @@ func (s *simpleScanner) Scan(dest ...any) error {
 	return nil
 }
 
-// QueryRow implements orm.Executor
-func (d *adapter) QueryRow(query string, args ...any) orm.Scanner {
+// QueryRow implements storage.Executor
+func (d *adapter) QueryRow(query string, args ...any) storage.Scanner {
 	if len(args) == 0 {
-		return &simpleScanner{err: Err("no query passed")}
+		return &simpleScanner{err: fmt.Err("no query passed")}
 	}
-	q, ok := args[0].(orm.Query)
+	q, ok := args[0].(storage.Query)
 	if !ok {
-		return &simpleScanner{err: Err("invalid query type")}
+		return &simpleScanner{err: fmt.Err("invalid query type")}
 	}
 	if len(args) < 2 {
-		return &simpleScanner{err: Err("missing model argument")}
+		return &simpleScanner{err: fmt.Err("missing model argument")}
 	}
 	m, ok := args[1].(Model)
 	if !ok {
-		return &simpleScanner{err: Err("invalid model type")}
+		return &simpleScanner{err: fmt.Err("invalid model type")}
 	}
 
 	err := d.execute(q, m, nil, nil, nil)
 	return &simpleScanner{err: err}
 }
 
-// simpleRows implements orm.Rows
+// simpleRows implements storage.Rows
 type simpleRows struct {
 	models []Model
 	values []js.Value
@@ -103,14 +101,14 @@ func (r *simpleRows) Next() bool {
 
 func (r *simpleRows) Scan(dest ...any) error {
 	if r.idx == 0 || (r.idx > len(r.models) && r.idx > len(r.values)) {
-		return Err("invalid row cursor")
+		return fmt.Err("invalid row cursor")
 	}
 
 	if len(r.models) > 0 {
 		m := r.models[r.idx-1]
 		ptrs := m.Pointers()
 		if len(ptrs) != len(dest) {
-			return Err("scan destination mismatch")
+			return fmt.Err("scan destination mismatch")
 		}
 
 		for i, p := range ptrs {
@@ -137,7 +135,7 @@ func (r *simpleRows) Scan(dest ...any) error {
 
 	val := r.values[r.idx-1]
 	if len(r.fields) != len(dest) {
-		return Err("scan destination mismatch with fields")
+		return fmt.Err("scan destination mismatch with fields")
 	}
 
 	for i, field := range r.fields {
@@ -147,7 +145,7 @@ func (r *simpleRows) Scan(dest ...any) error {
 		}
 
 		destPtr := dest[i]
-		switch field.Type {
+		switch field.Type.Storage() {
 		case FieldText:
 			if p, ok := destPtr.(*string); ok {
 				*p = jsVal.String()
@@ -183,21 +181,21 @@ func (r *simpleRows) Columns() ([]string, error) {
 func (r *simpleRows) Close() error { return nil }
 func (r *simpleRows) Err() error   { return nil }
 
-// Query implements orm.Executor
-func (d *adapter) Query(query string, args ...any) (orm.Rows, error) {
+// Query implements storage.Executor
+func (d *adapter) Query(query string, args ...any) (storage.Rows, error) {
 	if len(args) == 0 {
-		return nil, Err("no query passed")
+		return nil, fmt.Err("no query passed")
 	}
-	q, ok := args[0].(orm.Query)
+	q, ok := args[0].(storage.Query)
 	if !ok {
-		return nil, Err("invalid query type")
+		return nil, fmt.Err("invalid query type")
 	}
 	if len(args) < 2 {
-		return nil, Err("missing model argument")
+		return nil, fmt.Err("missing model argument")
 	}
 	m, ok := args[1].(Model)
 	if !ok {
-		return nil, Err("invalid model type")
+		return nil, fmt.Err("invalid model type")
 	}
 
 	var models []Model
@@ -236,7 +234,7 @@ func (d *adapter) Query(query string, args ...any) (orm.Rows, error) {
 	}, nil
 }
 
-// Close implements orm.Executor
+// Close implements storage.Executor
 func (d *adapter) Close() error {
 	if d.db.Truthy() {
 		d.db.Call("close")
@@ -245,7 +243,7 @@ func (d *adapter) Close() error {
 }
 
 // newAdapter creates a new adapter.
-func newAdapter(dbName string, idg idGenerator, logger func(...any)) *adapter {
+func newAdapter(dbName string, idg IDGenerator, logger func(...any)) *adapter {
 	if logger == nil {
 		logger = func(args ...any) {}
 	}
@@ -259,20 +257,24 @@ func newAdapter(dbName string, idg idGenerator, logger func(...any)) *adapter {
 	}
 }
 
-// Compiler converts ORM queries into engine instructions.
+// Compiler converts storage queries into engine instructions.
 type compiler struct{}
 
-func (c *compiler) Compile(q orm.Query, m Model) (orm.Plan, error) {
+func (c *compiler) Compile(q storage.Query, m Model) (storage.Plan, error) {
 	// Our adapter executes queries directly. We can pass the query and model as args in the plan.
-	return orm.Plan{Mode: q.Action, Query: "", Args: []any{q, m}}, nil
+	return storage.Plan{Mode: q.Action, Query: "", Args: []any{q, m}}, nil
 }
 
-// New initializes the IndexedDB database and returns an *orm.DB instance.
-func New(dbName string, idg idGenerator, logger func(...any), structTables ...any) *orm.DB {
+func (d *adapter) Compile(q storage.Query, m Model) (storage.Plan, error) {
+	return d.compiler.Compile(q, m)
+}
+
+// New initializes the IndexedDB database and returns a storage.Conn instance.
+func New(dbName string, idg IDGenerator, logger func(...any), structTables ...any) storage.Conn {
 	adapter := newAdapter(dbName, idg, logger)
+	adapter.compiler = &compiler{}
 	adapter.initialize(structTables...)
-	compiler := &compiler{}
-	return orm.New(adapter, compiler)
+	return adapter
 }
 
 // initialize initializes the IndexedDB database and creates object stores based on the provided structs.
@@ -295,7 +297,7 @@ func (d *adapter) open(p *js.Value, message string) error {
 	d.db = p.Get("target").Get("result")
 
 	if !d.db.Truthy() {
-		return Err("error open", d.dbName, message)
+		return fmt.Err("error open", d.dbName, message)
 	}
 	return nil
 }
@@ -368,7 +370,7 @@ func (d *adapter) onOpenExistingDB(this js.Value, p []js.Value) any {
 // createTable creates an IndexedDB object store from the model's Schema.
 func (d *adapter) createTable(m Model) error {
 	if d.initCompleted {
-		return Err("Dynamic table creation after initialization is not supported in IndexedDB adapter")
+		return fmt.Err("Dynamic table creation after initialization is not supported in IndexedDB adapter")
 	}
 
 	fields := m.Schema()
@@ -382,7 +384,7 @@ func (d *adapter) createTable(m Model) error {
 		}
 	}
 	if pkName == "" {
-		return Err("no primary key found in schema for table", tableName)
+		return fmt.Err("no primary key found in schema for table", tableName)
 	}
 
 	autoIncrement := false
@@ -435,3 +437,5 @@ func (d *adapter) getNewID() string {
 	}
 	return ""
 }
+
+var _ storage.Conn = (*adapter)(nil)

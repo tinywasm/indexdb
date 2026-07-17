@@ -7,6 +7,7 @@ import (
 
 	"github.com/tinywasm/indexdb"
 	. "github.com/tinywasm/model"
+	"github.com/tinywasm/storage"
 )
 
 // SimpleUser implements the Model interface for testing
@@ -18,11 +19,14 @@ type SimpleUser struct {
 func (m *SimpleUser) ModelName() string { return "simple_users" }
 func (m *SimpleUser) Schema() []Field {
 	return []Field{
-		{Name: "ID", Type: FieldText, DB: &FieldDB{PK: true}},
-		{Name: "Email", Type: FieldText, DB: &FieldDB{Unique: true}},
+		{Name: "ID", Type: Text(), DB: &FieldDB{PK: true}},
+		{Name: "Email", Type: Text(), DB: &FieldDB{Unique: true}},
 	}
 }
-func (m *SimpleUser) Pointers() []any { return []any{&m.ID, &m.Email} }
+func (m *SimpleUser) Pointers() []any             { return []any{&m.ID, &m.Email} }
+func (m *SimpleUser) EncodeFields(wr FieldWriter) {}
+func (m *SimpleUser) DecodeFields(r FieldReader)  {}
+func (m *SimpleUser) IsNil() bool                 { return m == nil }
 
 // SimpleSession implements the Model interface for testing
 type SimpleSession struct {
@@ -33,11 +37,14 @@ type SimpleSession struct {
 func (m *SimpleSession) ModelName() string { return "simple_sessions" }
 func (m *SimpleSession) Schema() []Field {
 	return []Field{
-		{Name: "ID", Type: FieldText, DB: &FieldDB{PK: true}},
-		{Name: "UserID", Type: FieldText},
+		{Name: "ID", Type: Text(), DB: &FieldDB{PK: true}},
+		{Name: "UserID", Type: Text()},
 	}
 }
-func (m *SimpleSession) Pointers() []any { return []any{&m.ID, &m.UserID} }
+func (m *SimpleSession) Pointers() []any             { return []any{&m.ID, &m.UserID} }
+func (m *SimpleSession) EncodeFields(wr FieldWriter) {}
+func (m *SimpleSession) DecodeFields(r FieldReader)  {}
+func (m *SimpleSession) IsNil() bool                 { return m == nil }
 
 // NumericPK implements the Model interface for testing
 type NumericPK struct {
@@ -48,11 +55,14 @@ type NumericPK struct {
 func (m *NumericPK) ModelName() string { return "numeric_pks" }
 func (m *NumericPK) Schema() []Field {
 	return []Field{
-		{Name: "ID", Type: FieldInt, DB: &FieldDB{PK: true}},
-		{Name: "Value", Type: FieldText},
+		{Name: "ID", Type: Int(), DB: &FieldDB{PK: true}},
+		{Name: "Value", Type: Text()},
 	}
 }
-func (m *NumericPK) Pointers() []any { return []any{&m.ID, &m.Value} }
+func (m *NumericPK) Pointers() []any             { return []any{&m.ID, &m.Value} }
+func (m *NumericPK) EncodeFields(wr FieldWriter) {}
+func (m *NumericPK) DecodeFields(r FieldReader)  {}
+func (m *NumericPK) IsNil() bool                 { return m == nil }
 
 func TestBugScenario(t *testing.T) {
 	t.Run("MultipleInitialization", func(t *testing.T) {
@@ -73,7 +83,14 @@ func TestBugScenario(t *testing.T) {
 		// If it doesn't block, subsequent operations would fail.
 		db := indexdb.New(dbName, nil, nil, &SimpleUser{})
 
-		err := db.Create(&SimpleUser{ID: "u1", Email: "u1@test.com"})
+		user := SimpleUser{ID: "u1", Email: "u1@test.com"}
+		query := storage.Query{
+			Action:  storage.ActionCreate,
+			Table:   "simple_users",
+			Columns: []string{"ID", "Email"},
+			Values:  []any{user.ID, user.Email},
+		}
+		err := db.Exec("", query, &user)
 		if err != nil {
 			t.Fatalf("Operation immediately after InitDB failed: %v", err)
 		}
@@ -83,12 +100,23 @@ func TestBugScenario(t *testing.T) {
 		db := SetupDB(nil, "text_pk_test", &SimpleUser{})
 		u := SimpleUser{ID: "alice", Email: "alice@test.com"}
 
-		if err := db.Create(&u); err != nil {
+		query := storage.Query{
+			Action:  storage.ActionCreate,
+			Table:   "simple_users",
+			Columns: []string{"ID", "Email"},
+			Values:  []any{u.ID, u.Email},
+		}
+		if err := db.Exec("", query, &u); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 
 		var read SimpleUser
-		err := db.Query(&read).Where("ID").Eq("alice").ReadOne()
+		readQuery := storage.Query{
+			Action:     storage.ActionReadOne,
+			Table:      "simple_users",
+			Conditions: []storage.Condition{storage.Eq("ID", "alice")},
+		}
+		err := db.QueryRow("", readQuery, &read).Scan()
 		if err != nil {
 			t.Fatalf("ReadOne failed: %v", err)
 		}
@@ -101,12 +129,23 @@ func TestBugScenario(t *testing.T) {
 		db := SetupDB(nil, "numeric_pk_test", &NumericPK{})
 		n := NumericPK{ID: 123, Value: "test"}
 
-		if err := db.Create(&n); err != nil {
+		query := storage.Query{
+			Action:  storage.ActionCreate,
+			Table:   "numeric_pks",
+			Columns: []string{"ID", "Value"},
+			Values:  []any{n.ID, n.Value},
+		}
+		if err := db.Exec("", query, &n); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 
 		var read NumericPK
-		err := db.Query(&read).Where("ID").Eq(int64(123)).ReadOne()
+		readQuery := storage.Query{
+			Action:     storage.ActionReadOne,
+			Table:      "numeric_pks",
+			Conditions: []storage.Condition{storage.Eq("ID", int64(123))},
+		}
+		err := db.QueryRow("", readQuery, &read).Scan()
 		if err != nil {
 			t.Fatalf("ReadOne failed: %v", err)
 		}
@@ -119,7 +158,12 @@ func TestBugScenario(t *testing.T) {
 		db := SetupDB(nil, "table_not_found_test", &SimpleUser{})
 
 		var session SimpleSession
-		err := db.Query(&session).Where("ID").Eq("s1").ReadOne()
+		readQuery := storage.Query{
+			Action:     storage.ActionReadOne,
+			Table:      "simple_sessions",
+			Conditions: []storage.Condition{storage.Eq("ID", "s1")},
+		}
+		err := db.QueryRow("", readQuery, &session).Scan()
 		if err == nil {
 			t.Fatal("Expected error for non-existent table, got nil")
 		}
@@ -130,13 +174,25 @@ func TestBugScenario(t *testing.T) {
 
 		// Seed some data
 		for i := 0; i < 10; i++ {
-			_ = db.Create(&SimpleUser{ID: string(rune('0' + i)), Email: "test@test.com"})
+			u := SimpleUser{ID: string(rune('0' + i)), Email: "test@test.com"}
+			query := storage.Query{
+				Action:  storage.ActionCreate,
+				Table:   "simple_users",
+				Columns: []string{"ID", "Email"},
+				Values:  []any{u.ID, u.Email},
+			}
+			_ = db.Exec("", query, &u)
 		}
 
 		// Sequential rapid queries
 		for i := 0; i < 5; i++ {
 			var u SimpleUser
-			err := db.Query(&u).Where("ID").Eq("0").ReadOne()
+			readQuery := storage.Query{
+				Action:     storage.ActionReadOne,
+				Table:      "simple_users",
+				Conditions: []storage.Condition{storage.Eq("ID", "0")},
+			}
+			err := db.QueryRow("", readQuery, &u).Scan()
 			if err != nil {
 				t.Fatalf("Query %d failed: %v", i, err)
 			}
@@ -147,12 +203,17 @@ func TestBugScenario(t *testing.T) {
 		db := SetupDB(nil, "empty_result_test", &SimpleUser{})
 
 		var u SimpleUser
-		err := db.Query(&u).Where("ID").Eq("missing").ReadOne()
+		readQuery := storage.Query{
+			Action:     storage.ActionReadOne,
+			Table:      "simple_users",
+			Conditions: []storage.Condition{storage.Eq("ID", "missing")},
+		}
+		err := db.QueryRow("", readQuery, &u).Scan()
 		if err == nil {
 			t.Fatal("Expected error for missing record, got nil")
 		}
-		if err.Error() != "record not found" {
-			t.Errorf("Expected 'record not found', got '%v'", err)
+		if err != storage.ErrNoRows {
+			t.Errorf("Expected storage.ErrNoRows, got '%v'", err)
 		}
 	})
 }

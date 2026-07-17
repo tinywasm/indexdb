@@ -2,11 +2,10 @@ module github.com/tinywasm/indexdb
 
 go 1.25.2
 
-require github.com/tinywasm/fmt v0.25.1
-
-require github.com/tinywasm/orm v0.9.26
+require github.com/tinywasm/fmt v0.25.3
 
 require (
-	github.com/tinywasm/jsvalue v0.0.14
-	github.com/tinywasm/model v0.0.6
+	github.com/tinywasm/jsvalue v0.0.17
+	github.com/tinywasm/model v0.0.15
+	github.com/tinywasm/storage v0.0.2
 )
