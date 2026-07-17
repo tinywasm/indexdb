@@ -9,7 +9,7 @@ import (
 	"github.com/tinywasm/jsvalue"
 
 	. "github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
+	"github.com/tinywasm/storage"
 )
 
 type FakeModel struct {
@@ -24,13 +24,13 @@ type FakeModel struct {
 func (m *FakeModel) ModelName() string { return "fake" }
 func (m *FakeModel) Schema() []Field {
 	return []Field{
-		{Name: "ID", Type: FieldText, DB: &FieldDB{PK: true}},
-		{Name: "Score", Type: FieldFloat},
-		{Name: "Age", Type: FieldInt},
-		{Name: "Valid", Type: FieldBool},
-		{Name: "Time", Type: FieldInt},
-		{Name: "Blob", Type: FieldBlob},
-		{Name: "Missing", Type: FieldText},
+		{Name: "ID", Type: Text(), DB: &FieldDB{PK: true}},
+		{Name: "Score", Type: Float()},
+		{Name: "Age", Type: Int()},
+		{Name: "Valid", Type: Bool()},
+		{Name: "Time", Type: Int()},
+		{Name: "Blob", Type: Blob()},
+		{Name: "Missing", Type: Text()},
 	}
 }
 func (m *FakeModel) Values() []any {
@@ -40,6 +40,9 @@ func (m *FakeModel) Pointers() []any {
 	var missing string
 	return []any{&m.ID, &m.Score, &m.Age, &m.Valid, &m.Time, &m.Blob, &missing}
 }
+func (m *FakeModel) EncodeFields(wr FieldWriter) {}
+func (m *FakeModel) DecodeFields(r FieldReader)  {}
+func (m *FakeModel) IsNil() bool                { return m == nil }
 
 func TestMapResultTypes(t *testing.T) {
 	m := &FakeModel{}
@@ -80,90 +83,90 @@ func TestMapResultTypes(t *testing.T) {
 func TestCheckConditionOperators(t *testing.T) {
 	// JS string
 	strVal := js.ValueOf("hello")
-	if !checkCondition(strVal, orm.Eq("f", "hello")) {
+	if !checkCondition(strVal, storage.Eq("f", "hello")) {
 		t.Error("string = hello failed")
 	}
-	if !checkCondition(strVal, orm.Neq("f", "world")) {
+	if !checkCondition(strVal, storage.Neq("f", "world")) {
 		t.Error("string != world failed")
 	}
-	if checkCondition(strVal, orm.Gt("f", "world")) {
+	if checkCondition(strVal, storage.Gt("f", "world")) {
 		t.Error("string > world should fail usually unless hello>world")
 	} // hello is not > world
 
 	strValWorld := js.ValueOf("world")
-	if !checkCondition(strValWorld, orm.Gt("f", "hello")) {
+	if !checkCondition(strValWorld, storage.Gt("f", "hello")) {
 		t.Error("string > hello failed")
 	}
-	if !checkCondition(strValWorld, orm.Gte("f", "hello")) {
+	if !checkCondition(strValWorld, storage.Gte("f", "hello")) {
 		t.Error("string >= hello failed")
 	}
-	if !checkCondition(strVal, orm.Lt("f", "world")) {
+	if !checkCondition(strVal, storage.Lt("f", "world")) {
 		t.Error("string < world failed")
 	}
-	if !checkCondition(strVal, orm.Lte("f", "world")) {
+	if !checkCondition(strVal, storage.Lte("f", "world")) {
 		t.Error("string <= world failed")
 	}
 
 	// JS Number
 	numVal := js.ValueOf(42.5)
-	if !checkCondition(numVal, orm.Eq("f", 42.5)) {
+	if !checkCondition(numVal, storage.Eq("f", 42.5)) {
 		t.Error("num = 42.5 failed")
 	}
-	if checkCondition(numVal, orm.Eq("f", 42.0)) {
+	if checkCondition(numVal, storage.Eq("f", 42.0)) {
 		t.Error("num = 42.0 should fail")
 	}
 
-	if !checkCondition(numVal, orm.Neq("f", 42.0)) {
+	if !checkCondition(numVal, storage.Neq("f", 42.0)) {
 		t.Error("num != 42.0 failed")
 	}
 
-	if !checkCondition(numVal, orm.Gt("f", 40.0)) {
+	if !checkCondition(numVal, storage.Gt("f", 40.0)) {
 		t.Error("num > 40.0 failed")
 	}
-	if !checkCondition(numVal, orm.Gt("f", 40)) {
+	if !checkCondition(numVal, storage.Gt("f", 40)) {
 		t.Error("num > 40 failed")
 	}
 
-	if !checkCondition(numVal, orm.Gte("f", 42.5)) {
+	if !checkCondition(numVal, storage.Gte("f", 42.5)) {
 		t.Error("num >= 42.5 failed")
 	}
-	if !checkCondition(numVal, orm.Gte("f", 42)) {
+	if !checkCondition(numVal, storage.Gte("f", 42)) {
 		t.Error("num >= 42 failed")
 	}
 
-	if !checkCondition(numVal, orm.Lt("f", 50.0)) {
+	if !checkCondition(numVal, storage.Lt("f", 50.0)) {
 		t.Error("num < 50.0 failed")
 	}
-	if !checkCondition(numVal, orm.Lt("f", 50)) {
+	if !checkCondition(numVal, storage.Lt("f", 50)) {
 		t.Error("num < 50 failed")
 	}
 
-	if !checkCondition(numVal, orm.Lte("f", 42.5)) {
+	if !checkCondition(numVal, storage.Lte("f", 42.5)) {
 		t.Error("num <= 42.5 failed")
 	}
-	if !checkCondition(numVal, orm.Lte("f", 43)) {
+	if !checkCondition(numVal, storage.Lte("f", 43)) {
 		t.Error("num <= 43 failed")
 	}
 
 	// JS Bool
 	boolVal := js.ValueOf(true)
-	if !checkCondition(boolVal, orm.Eq("f", true)) {
+	if !checkCondition(boolVal, storage.Eq("f", true)) {
 		t.Error("bool = true failed")
 	}
-	if !checkCondition(boolVal, orm.Neq("f", false)) {
+	if !checkCondition(boolVal, storage.Neq("f", false)) {
 		t.Error("bool != false failed")
 	}
 
 	// Unknown JS Type (Array)
 	arrVal := js.ValueOf([]any{})
-	if checkCondition(arrVal, orm.Eq("f", 1)) {
+	if checkCondition(arrVal, storage.Eq("f", 1)) {
 		t.Error("array eq should fail")
 	}
 }
 
 func TestExecuteDefaultAction(t *testing.T) {
 	adapter := newAdapter("test_db", nil, nil)
-	err := adapter.execute(orm.Query{Action: 999}, nil, nil, nil, nil)
+	err := adapter.execute(storage.Query{Action: 999}, nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unimplemented action")
 	}
@@ -173,51 +176,54 @@ type UnknownTable struct{}
 
 func (u *UnknownTable) ModelName() string { return "unknown_table" }
 func (u *UnknownTable) Schema() []Field {
-	return []Field{{Name: "id", Type: FieldText, DB: &FieldDB{PK: true}}}
+	return []Field{{Name: "id", Type: Text(), DB: &FieldDB{PK: true}}}
 }
-func (u *UnknownTable) Values() []any   { return []any{} }
-func (u *UnknownTable) Pointers() []any { return []any{} }
+func (u *UnknownTable) Values() []any                 { return []any{} }
+func (u *UnknownTable) Pointers() []any               { return []any{} }
+func (u *UnknownTable) EncodeFields(wr FieldWriter)   {}
+func (u *UnknownTable) DecodeFields(r FieldReader)    {}
+func (u *UnknownTable) IsNil() bool                  { return u == nil }
 
 func TestExecuteActionNotImplemented(t *testing.T) {
 	// Create adapter directly to test execute default case
 	adapter := newAdapter("test_db", nil, nil)
-	err := adapter.execute(orm.Query{Action: 999}, nil, nil, nil, nil)
+	err := adapter.execute(storage.Query{Action: 999}, nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unimplemented action")
 	}
 
 	// Test GetStore error on create
-	err = adapter.execute(orm.Query{Action: orm.ActionCreate, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
+	err = adapter.execute(storage.Query{Action: storage.ActionCreate, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unitialized DB / GetStore")
 	}
 
 	// Test GetStore error on update
-	err = adapter.execute(orm.Query{Action: orm.ActionUpdate, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
+	err = adapter.execute(storage.Query{Action: storage.ActionUpdate, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unitialized DB / GetStore on update")
 	}
 
 	// Test GetStore error on delete
-	err = adapter.execute(orm.Query{Action: orm.ActionDelete, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
+	err = adapter.execute(storage.Query{Action: storage.ActionDelete, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unitialized DB / GetStore on delete")
 	}
 
 	// Test GetStore error on readOne
-	err = adapter.execute(orm.Query{Action: orm.ActionReadOne, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
+	err = adapter.execute(storage.Query{Action: storage.ActionReadOne, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unitialized DB / GetStore on readOne")
 	}
 
 	// Test GetStore error on readAll
-	err = adapter.execute(orm.Query{Action: orm.ActionReadAll, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
+	err = adapter.execute(storage.Query{Action: storage.ActionReadAll, Table: "non_existent"}, &UnknownTable{}, nil, nil, nil)
 	if err == nil {
 		t.Fatal("Expected error for unitialized DB / GetStore on readAll")
 	}
 
 	// Test Query method error checks
-	_, err = adapter.Query("", orm.Query{})
+	_, err = adapter.Query("", storage.Query{})
 	if err == nil {
 		t.Fatal("Expected error on invalid args to Query")
 	}
@@ -265,7 +271,7 @@ func TestAdapterQueryScanCoverage(t *testing.T) {
 
 	// We'll just call adapter.Query with the mock rows logic
 	// Mock executing Query on uninitialized DB - hits execute error.
-	rows, err := adapter.Query("", orm.Query{Action: orm.ActionReadAll, Table: "non_existent"}, &FakeModel{})
+	rows, err := adapter.Query("", storage.Query{Action: storage.ActionReadAll, Table: "non_existent"}, &FakeModel{})
 	if err == nil {
 		t.Error("Expected error from Query on non existent")
 	}

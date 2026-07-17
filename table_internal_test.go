@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	. "github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
+	"github.com/tinywasm/storage"
 )
 
 // TestIndexDBCrudOperations tests basic CRUD operations in IndexDB
@@ -15,14 +15,16 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	// Setup the database with tables
 	db := SetupDB(nil, "", &User{}, &Product{})
 
-	// Tables should be implicitly created by New during SetupDB.
-	// We no longer manually test TableExist here because the ORM wrapper handles it via adapter.
-	// If needed we could use reflection or type assertion to get adapter, but better to test functionally.
-
 	userOne := User{Name: "Alice", Email: "alice@example.com"}
-	userOne.ID = "1" // Manually assigning simple ID for test since we no longer access adapter directly
+	userOne.ID = "1" // Manually assigning simple ID for test
 
-	err := db.Create(&userOne)
+	query := storage.Query{
+		Action:  storage.ActionCreate,
+		Table:   "user",
+		Columns: []string{"ID", "Name", "Email"},
+		Values:  []any{userOne.ID, userOne.Name, userOne.Email},
+	}
+	err := db.Exec("", query, &userOne)
 	if err != nil {
 		t.Fatalf("Failed to create user: %v", err)
 	}
@@ -33,7 +35,12 @@ func TestIndexDBCrudOperations(t *testing.T) {
 
 	// READ ONE
 	var userRead User
-	err = db.Query(&userRead).Where("ID").Eq(userOne.ID).ReadOne()
+	readQuery := storage.Query{
+		Action:     storage.ActionReadOne,
+		Table:      "user",
+		Conditions: []storage.Condition{storage.Eq("ID", userOne.ID)},
+	}
+	err = db.QueryRow("", readQuery, &userRead).Scan()
 	if err != nil {
 		t.Fatalf("Failed to read user: %v", err)
 	}
@@ -43,14 +50,21 @@ func TestIndexDBCrudOperations(t *testing.T) {
 
 	// UPDATE user
 	userOne.Email = "alice@newdomain.com"
-	err = db.Update(&userOne, orm.Eq("ID", userOne.ID))
+	updateQuery := storage.Query{
+		Action:     storage.ActionUpdate,
+		Table:      "user",
+		Columns:    []string{"ID", "Name", "Email"},
+		Values:     []any{userOne.ID, userOne.Name, userOne.Email},
+		Conditions: []storage.Condition{storage.Eq("ID", userOne.ID)},
+	}
+	err = db.Exec("", updateQuery, &userOne)
 	if err != nil {
 		t.Fatalf("Failed to update user: %v", err)
 	}
 
 	// Verify Update
 	var userUpdated User
-	err = db.Query(&userUpdated).Where("ID").Eq(userOne.ID).ReadOne()
+	err = db.QueryRow("", readQuery, &userUpdated).Scan()
 	if err != nil {
 		t.Fatalf("Failed to read updated user: %v", err)
 	}
@@ -59,53 +73,103 @@ func TestIndexDBCrudOperations(t *testing.T) {
 	}
 
 	// DELETE
-	err = db.Delete(&userOne, orm.Eq("ID", userOne.ID))
+	deleteQuery := storage.Query{
+		Action:     storage.ActionDelete,
+		Table:      "user",
+		Conditions: []storage.Condition{storage.Eq("ID", userOne.ID)},
+	}
+	err = db.Exec("", deleteQuery, &userOne)
 	if err != nil {
 		t.Fatalf("Failed to delete user: %v", err)
 	}
 
 	// Verify Delete
 	var userDeleted User
-	err = db.Query(&userDeleted).Where("ID").Eq(userOne.ID).ReadOne()
+	err = db.QueryRow("", readQuery, &userDeleted).Scan()
 	if err == nil {
 		t.Fatal("Expected error finding deleted user, got nil")
 	}
+	if err != storage.ErrNoRows {
+		t.Fatalf("Expected ErrNoRows, got %v", err)
+	}
 
 	// Delete on non-existent
-	_ = db.Delete(&User{ID: "999999"}, orm.Eq("ID", "999999"))
+	nonExistentDelete := storage.Query{
+		Action:     storage.ActionDelete,
+		Table:      "user",
+		Conditions: []storage.Condition{storage.Eq("ID", "999999")},
+	}
+	_ = db.Exec("", nonExistentDelete, &User{ID: "999999"})
 
-	// Delete multi-condition
-	err = db.Delete(&User{ID: "1"}, orm.Eq("ID", "1"), orm.Eq("Name", "Alice"))
-	if err == nil {
-		t.Fatal("Expected error finding multi-condition delete, got nil")
+	// Delete multi-condition (now fully supported!)
+	multiDeleteQuery := storage.Query{
+		Action:     storage.ActionDelete,
+		Table:      "user",
+		Conditions: []storage.Condition{storage.Eq("ID", "1"), storage.Eq("Name", "Alice")},
+	}
+	err = db.Exec("", multiDeleteQuery, &User{ID: "1"})
+	if err != nil {
+		t.Fatalf("Unexpected error finding multi-condition delete: %v", err)
 	}
 
 	// ReadOne via cursor path (no single PK condition)
 	var alice User
-	_ = db.Query(&alice).Where("Name").Eq("Alice").ReadOne()
+	cursorReadQuery := storage.Query{
+		Action:     storage.ActionReadOne,
+		Table:      "user",
+		Conditions: []storage.Condition{storage.Eq("Name", "Alice")},
+	}
+	_ = db.QueryRow("", cursorReadQuery, &alice).Scan()
 
 	// Create and read by non-PK to find it
-	db.Create(&User{ID: "bob_id", Name: "Bob", Email: "bob@domain.com"})
-	var bob User
-	err = db.Query(&bob).Where("Name").Eq("Bob").ReadOne()
+	bob := User{ID: "bob_id", Name: "Bob", Email: "bob@domain.com"}
+	createBobQuery := storage.Query{
+		Action:  storage.ActionCreate,
+		Table:   "user",
+		Columns: []string{"ID", "Name", "Email"},
+		Values:  []any{bob.ID, bob.Name, bob.Email},
+	}
+	err = db.Exec("", createBobQuery, &bob)
+	if err != nil {
+		t.Fatalf("Failed to create Bob: %v", err)
+	}
+
+	var bobRead User
+	readBobByNameQuery := storage.Query{
+		Action:     storage.ActionReadOne,
+		Table:      "user",
+		Conditions: []storage.Condition{storage.Eq("Name", "Bob")},
+	}
+	err = db.QueryRow("", readBobByNameQuery, &bobRead).Scan()
 	if err != nil {
 		t.Fatalf("Failed to read Bob by name: %v", err)
 	}
-	if bob.ID != "bob_id" {
-		t.Fatalf("Expected Bob's ID to be bob_id, got %s", bob.ID)
+	if bobRead.ID != "bob_id" {
+		t.Fatalf("Expected Bob's ID to be bob_id, got %s", bobRead.ID)
 	}
 
-	// Read All via Cursor (using idiomatic ORM API)
-	var users []User
-	err = db.Query(&User{}).Where("Name").Eq("Bob").ReadAll(
-		func() Model { return &User{} },
-		func(m Model) {
-			users = append(users, *(m.(*User)))
-		},
-	)
+	// Read All via Cursor
+	readAllQuery := storage.Query{
+		Action:     storage.ActionReadAll,
+		Table:      "user",
+		Conditions: []storage.Condition{storage.Eq("Name", "Bob")},
+	}
+	rows, err := db.Query("", readAllQuery, &User{}, func() Model { return &User{} })
 	if err != nil {
 		t.Fatalf("ReadAll by Name failed: %v", err)
 	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		err := rows.Scan(&u.ID, &u.Name, &u.Email)
+		if err != nil {
+			t.Fatalf("Scan failed: %v", err)
+		}
+		users = append(users, u)
+	}
+
 	if len(users) != 1 {
 		t.Fatalf("Expected 1 user, got %d", len(users))
 	}
@@ -114,28 +178,21 @@ func TestIndexDBCrudOperations(t *testing.T) {
 // Test close execution branch
 func TestCloseDb(t *testing.T) {
 	db := SetupDB(nil, "close_db", &User{})
-	// Assuming raw executor handles Close
 	_ = db.Close()
 	// Should not panic
 }
 
 // Extra coverage for tableExist
 func TestTableExist(t *testing.T) {
-	// Let's use SetupDB normally
 	db := SetupDB(nil, "exist_db", &User{})
-	// Try accessing raw adapter via db.RawExecutor
-	raw := db.RawExecutor()
-	if raw != nil {
-		if a, ok := raw.(*adapter); ok {
-			exists := a.tableExist("user")
-			if !exists {
-				t.Error("Table user should exist")
-			}
-			notExists := a.tableExist("unknown")
-			if notExists {
-				t.Error("Table unknown should not exist")
-			}
-		}
+	adapter := db.(*adapter)
+	exists := adapter.tableExist("user")
+	if !exists {
+		t.Error("Table user should exist")
+	}
+	notExists := adapter.tableExist("unknown")
+	if notExists {
+		t.Error("Table unknown should not exist")
 	}
 }
 
@@ -143,5 +200,12 @@ func TestTableExist(t *testing.T) {
 func TestReadAllEdgeCases(t *testing.T) {
 	db := SetupDB(nil, "readall_edge", &User{})
 
-	db.Create(&User{ID: "edge1", Name: "Edge1"})
+	user := User{ID: "edge1", Name: "Edge1"}
+	query := storage.Query{
+		Action:  storage.ActionCreate,
+		Table:   "user",
+		Columns: []string{"ID", "Name", "Email"},
+		Values:  []any{user.ID, user.Name, user.Email},
+	}
+	_ = db.Exec("", query, &user)
 }

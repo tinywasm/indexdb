@@ -16,9 +16,8 @@ func TestGetStore_ExistingTable_Succeeds(t *testing.T) {
 	db := SetupDB(nil, dbName, &User{})
 	defer db.Close()
 
-	// Get the adapter from the orm.DB
-	// orm.DB exposes RawExecutor() which returns our adapter
-	adapter := db.RawExecutor().(*adapter)
+	// Get the adapter from the storage.Conn
+	adapter := db.(*adapter)
 
 	store, err := adapter.getStore("user", "readonly")
 	if err != nil {
@@ -38,7 +37,7 @@ func TestGetStore_MissingTable_ReturnsError(t *testing.T) {
 	db := SetupDB(nil, dbName, &User{})
 	defer db.Close()
 
-	adapter := db.RawExecutor().(*adapter)
+	adapter := db.(*adapter)
 
 	store, err := adapter.getStore("nonexistent", "readonly")
 	if err == nil {
@@ -81,7 +80,7 @@ func TestGetStore_NoCrash_OnMissingTable(t *testing.T) {
 	db := SetupDB(nil, dbName, &User{})
 	defer db.Close()
 
-	adapter := db.RawExecutor().(*adapter)
+	adapter := db.(*adapter)
 
 	// We want to ensure that calling getStore on a missing table doesn't panic.
 	// Since we are not in TinyGo, recover() would work, but the goal is to NOT

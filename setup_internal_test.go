@@ -3,9 +3,9 @@
 package indexdb
 
 import (
-	. "github.com/tinywasm/fmt"
+	"github.com/tinywasm/fmt"
 	. "github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
+	"github.com/tinywasm/storage"
 )
 
 // testIDGenerator implements the idGenerator interface for testing
@@ -15,12 +15,11 @@ type testIDGenerator struct {
 
 func (t *testIDGenerator) NewID() string {
 	t.counter++
-	return Sprintf("%d", t.counter) // Simple ID generation for tests
+	return fmt.Sprintf("%d", t.counter) // Simple ID generation for tests
 }
 
 // SetupDB creates a new IndexDB instance for testing
-// Now returns *orm.DB
-func SetupDB(logger func(...any), dbName string, structTables ...any) *orm.DB {
+func SetupDB(logger func(...any), dbName string, structTables ...any) storage.Conn {
 	testDbName := "local_test_db"
 	if dbName != "" {
 		testDbName = dbName
@@ -46,13 +45,16 @@ type User struct {
 func (u *User) ModelName() string { return "user" }
 func (u *User) Schema() []Field {
 	return []Field{
-		{Name: "ID", Type: FieldText, DB: &FieldDB{PK: true}},
-		{Name: "Name", Type: FieldText},
-		{Name: "Email", Type: FieldText},
+		{Name: "ID", Type: Text(), DB: &FieldDB{PK: true}},
+		{Name: "Name", Type: Text()},
+		{Name: "Email", Type: Text()},
 	}
 }
-func (u *User) Values() []any   { return []any{u.ID, u.Name, u.Email} }
-func (u *User) Pointers() []any { return []any{&u.ID, &u.Name, &u.Email} }
+func (u *User) Values() []any                 { return []any{u.ID, u.Name, u.Email} }
+func (u *User) Pointers() []any               { return []any{&u.ID, &u.Name, &u.Email} }
+func (u *User) EncodeFields(wr FieldWriter)   {}
+func (u *User) DecodeFields(r FieldReader)    {}
+func (u *User) IsNil() bool                  { return u == nil }
 
 // TestProduct represents another sample struct for testing
 type Product struct {
@@ -65,10 +67,13 @@ type Product struct {
 func (p *Product) ModelName() string { return "product" }
 func (p *Product) Schema() []Field {
 	return []Field{
-		{Name: "IDProduct", Type: FieldText, DB: &FieldDB{PK: true}},
-		{Name: "Name", Type: FieldText},
-		{Name: "Price", Type: FieldFloat},
+		{Name: "IDProduct", Type: Text(), DB: &FieldDB{PK: true}},
+		{Name: "Name", Type: Text()},
+		{Name: "Price", Type: Float()},
 	}
 }
-func (p *Product) Values() []any   { return []any{p.IDProduct, p.Name, p.Price} }
-func (p *Product) Pointers() []any { return []any{&p.IDProduct, &p.Name, &p.Price} }
+func (p *Product) Values() []any                 { return []any{p.IDProduct, p.Name, p.Price} }
+func (p *Product) Pointers() []any               { return []any{&p.IDProduct, &p.Name, &p.Price} }
+func (p *Product) EncodeFields(wr FieldWriter)   {}
+func (p *Product) DecodeFields(r FieldReader)    {}
+func (p *Product) IsNil() bool                  { return p == nil }

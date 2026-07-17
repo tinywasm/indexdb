@@ -5,7 +5,7 @@ package indexdb
 import (
 	"syscall/js"
 
-	. "github.com/tinywasm/fmt"
+	"github.com/tinywasm/fmt"
 )
 
 // processCursorRequest handles an IndexedDB cursor request (openCursor).
@@ -47,7 +47,7 @@ func processCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error
 		if errVal.Truthy() {
 			errMsg = errVal.Get("message").String()
 		}
-		err = Err("IndexedDB cursor failed:", errMsg)
+		err = fmt.Err("IndexedDB cursor failed:", errMsg)
 		// Only close done on error if not already closed
 		select {
 		case <-done:
@@ -69,7 +69,7 @@ func processCursorRequest(req js.Value, onNext func(cursor js.Value) bool) error
 // mode should be "readonly" or "readwrite".
 func (d *adapter) getStore(tableName string, mode string) (js.Value, error) {
 	if !d.db.Truthy() {
-		return js.Value{}, Err("Database not initialized")
+		return js.Value{}, fmt.Err("Database not initialized")
 	}
 
 	// Pre-check object store existence. Calling transaction() with an unknown
@@ -77,17 +77,17 @@ func (d *adapter) getStore(tableName string, mode string) (js.Value, error) {
 	// (recover() not supported on this target — see tinygo.org/docs/reference/lang-support).
 	storeNames := d.db.Get("objectStoreNames")
 	if !storeNames.Truthy() || !storeNames.Call("contains", tableName).Bool() {
-		return js.Value{}, Err("Object store", tableName, "not found")
+		return js.Value{}, fmt.Err("Object store", tableName, "not found")
 	}
 
 	tx := d.db.Call("transaction", tableName, mode)
 	if !tx.Truthy() {
-		return js.Value{}, Err("Failed to create transaction for table", tableName)
+		return js.Value{}, fmt.Err("Failed to create transaction for table", tableName)
 	}
 
 	store := tx.Call("objectStore", tableName)
 	if !store.Truthy() {
-		return js.Value{}, Err("Failed to get object store for table", tableName)
+		return js.Value{}, fmt.Err("Failed to get object store for table", tableName)
 	}
 
 	return store, nil
