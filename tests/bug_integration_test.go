@@ -23,10 +23,10 @@ func (m *SimpleUser) Schema() []Field {
 		{Name: "Email", Type: Text(), DB: &FieldDB{Unique: true}},
 	}
 }
-func (m *SimpleUser) Pointers() []any               { return []any{&m.ID, &m.Email} }
-func (m *SimpleUser) EncodeFields(wr FieldWriter)   {}
-func (m *SimpleUser) DecodeFields(r FieldReader)    {}
-func (m *SimpleUser) IsNil() bool                  { return m == nil }
+func (m *SimpleUser) Pointers() []any             { return []any{&m.ID, &m.Email} }
+func (m *SimpleUser) EncodeFields(wr FieldWriter) {}
+func (m *SimpleUser) DecodeFields(r FieldReader)  {}
+func (m *SimpleUser) IsNil() bool                 { return m == nil }
 
 // SimpleSession implements the Model interface for testing
 type SimpleSession struct {
@@ -41,10 +41,10 @@ func (m *SimpleSession) Schema() []Field {
 		{Name: "UserID", Type: Text()},
 	}
 }
-func (m *SimpleSession) Pointers() []any               { return []any{&m.ID, &m.UserID} }
-func (m *SimpleSession) EncodeFields(wr FieldWriter)   {}
-func (m *SimpleSession) DecodeFields(r FieldReader)    {}
-func (m *SimpleSession) IsNil() bool                  { return m == nil }
+func (m *SimpleSession) Pointers() []any             { return []any{&m.ID, &m.UserID} }
+func (m *SimpleSession) EncodeFields(wr FieldWriter) {}
+func (m *SimpleSession) DecodeFields(r FieldReader)  {}
+func (m *SimpleSession) IsNil() bool                 { return m == nil }
 
 // NumericPK implements the Model interface for testing
 type NumericPK struct {
@@ -59,10 +59,10 @@ func (m *NumericPK) Schema() []Field {
 		{Name: "Value", Type: Text()},
 	}
 }
-func (m *NumericPK) Pointers() []any               { return []any{&m.ID, &m.Value} }
-func (m *NumericPK) EncodeFields(wr FieldWriter)   {}
-func (m *NumericPK) DecodeFields(r FieldReader)    {}
-func (m *NumericPK) IsNil() bool                  { return m == nil }
+func (m *NumericPK) Pointers() []any             { return []any{&m.ID, &m.Value} }
+func (m *NumericPK) EncodeFields(wr FieldWriter) {}
+func (m *NumericPK) DecodeFields(r FieldReader)  {}
+func (m *NumericPK) IsNil() bool                 { return m == nil }
 
 func TestBugScenario(t *testing.T) {
 	t.Run("MultipleInitialization", func(t *testing.T) {

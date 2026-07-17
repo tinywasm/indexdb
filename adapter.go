@@ -11,16 +11,12 @@ import (
 	"github.com/tinywasm/storage"
 )
 
-type idGenerator interface {
-	NewID() string
-}
-
 type adapter struct {
 	dbName string
 	db     js.Value
 	tables []any
 	logger func(...any)
-	idGen  idGenerator
+	idGen  IDGenerator
 
 	compiler *compiler
 
@@ -247,7 +243,7 @@ func (d *adapter) Close() error {
 }
 
 // newAdapter creates a new adapter.
-func newAdapter(dbName string, idg idGenerator, logger func(...any)) *adapter {
+func newAdapter(dbName string, idg IDGenerator, logger func(...any)) *adapter {
 	if logger == nil {
 		logger = func(args ...any) {}
 	}
@@ -274,7 +270,7 @@ func (d *adapter) Compile(q storage.Query, m Model) (storage.Plan, error) {
 }
 
 // New initializes the IndexedDB database and returns a storage.Conn instance.
-func New(dbName string, idg idGenerator, logger func(...any), structTables ...any) storage.Conn {
+func New(dbName string, idg IDGenerator, logger func(...any), structTables ...any) storage.Conn {
 	adapter := newAdapter(dbName, idg, logger)
 	adapter.compiler = &compiler{}
 	adapter.initialize(structTables...)

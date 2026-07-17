@@ -10,7 +10,7 @@ import (
 	"github.com/tinywasm/storage"
 )
 
-// idGenerator implements the idGenerator interface for testing
+// idGenerator implements model.IDGenerator for testing
 type idGenerator struct {
 	counter int
 }
@@ -52,11 +52,11 @@ func (u *User) Schema() []Field {
 		{Name: "Email", Type: Text()},
 	}
 }
-func (u *User) Values() []any                 { return []any{u.ID, u.Name, u.Email} }
-func (u *User) Pointers() []any               { return []any{&u.ID, &u.Name, &u.Email} }
-func (u *User) EncodeFields(wr FieldWriter)   {}
-func (u *User) DecodeFields(r FieldReader)    {}
-func (u *User) IsNil() bool                  { return u == nil }
+func (u *User) Values() []any               { return []any{u.ID, u.Name, u.Email} }
+func (u *User) Pointers() []any             { return []any{&u.ID, &u.Name, &u.Email} }
+func (u *User) EncodeFields(wr FieldWriter) {}
+func (u *User) DecodeFields(r FieldReader)  {}
+func (u *User) IsNil() bool                 { return u == nil }
 
 // TestProduct represents another sample struct for testing
 type Product struct {
@@ -74,8 +74,8 @@ func (p *Product) Schema() []Field {
 		{Name: "Price", Type: Float()},
 	}
 }
-func (p *Product) Values() []any                 { return []any{p.IDProduct, p.Name, p.Price} }
-func (p *Product) Pointers() []any               { return []any{&p.IDProduct, &p.Name, &p.Price} }
-func (p *Product) EncodeFields(wr FieldWriter)   {}
-func (p *Product) DecodeFields(r FieldReader)    {}
-func (p *Product) IsNil() bool                  { return p == nil }
+func (p *Product) Values() []any               { return []any{p.IDProduct, p.Name, p.Price} }
+func (p *Product) Pointers() []any             { return []any{&p.IDProduct, &p.Name, &p.Price} }
+func (p *Product) EncodeFields(wr FieldWriter) {}
+func (p *Product) DecodeFields(r FieldReader)  {}
+func (p *Product) IsNil() bool                 { return p == nil }

@@ -1,6 +1,6 @@
 //go:build wasm
 
-package indexdb
+package tests_test
 
 import (
 	"testing"
@@ -13,7 +13,7 @@ import (
 func TestIndexDBCrudOperations(t *testing.T) {
 
 	// Setup the database with tables
-	db := SetupDB(nil, "", &User{}, &Product{})
+	db := SetupDB(nil, "crud_operations_test", &User{}, &Product{})
 
 	userOne := User{Name: "Alice", Email: "alice@example.com"}
 	userOne.ID = "1" // Manually assigning simple ID for test
@@ -180,20 +180,6 @@ func TestCloseDb(t *testing.T) {
 	db := SetupDB(nil, "close_db", &User{})
 	_ = db.Close()
 	// Should not panic
-}
-
-// Extra coverage for tableExist
-func TestTableExist(t *testing.T) {
-	db := SetupDB(nil, "exist_db", &User{})
-	adapter := db.(*adapter)
-	exists := adapter.tableExist("user")
-	if !exists {
-		t.Error("Table user should exist")
-	}
-	notExists := adapter.tableExist("unknown")
-	if notExists {
-		t.Error("Table unknown should not exist")
-	}
 }
 
 // Extra ReadAll edge cases
