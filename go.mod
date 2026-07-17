@@ -6,6 +6,6 @@ require github.com/tinywasm/fmt v0.25.3
 
 require (
 	github.com/tinywasm/jsvalue v0.0.17
-	github.com/tinywasm/model v0.0.15
+	github.com/tinywasm/model v0.0.16
 	github.com/tinywasm/storage v0.0.2
 )
