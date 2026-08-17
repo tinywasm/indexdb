@@ -6,6 +6,7 @@ import (
 	"sort"
 	"syscall/js"
 
+	"github.com/tinywasm/await"
 	"github.com/tinywasm/jsvalue"
 
 	"github.com/tinywasm/fmt"
@@ -46,7 +47,7 @@ func (d *adapter) create(q storage.Query, m Model) error {
 
 	// Deploy store.add() and explicitly await its resolution event.
 	req := store.Call("add", data)
-	_, err = jsvalue.AwaitRequest(req)
+	_, err = await.Request(req)
 	return err
 }
 
@@ -69,7 +70,7 @@ func (d *adapter) update(q storage.Query, m Model) error {
 	if len(q.Conditions) == 1 && q.Conditions[0].Operator() == "=" && q.Conditions[0].Field() == pkName {
 		pkValue := q.Conditions[0].Value()
 		getReq := store.Call("get", pkValue)
-		val, err := jsvalue.AwaitRequest(getReq)
+		val, err := await.Request(getReq)
 		if err != nil {
 			return err
 		}
@@ -107,7 +108,7 @@ func (d *adapter) update(q storage.Query, m Model) error {
 		}
 
 		putReq := store.Call("put", data)
-		_, err = jsvalue.AwaitRequest(putReq)
+		_, err = await.Request(putReq)
 		return err
 	}
 
@@ -158,7 +159,7 @@ func (d *adapter) update(q storage.Query, m Model) error {
 		}
 
 		putReq := store.Call("put", data)
-		_, err = jsvalue.AwaitRequest(putReq)
+		_, err = await.Request(putReq)
 		if err != nil {
 			return err
 		}
@@ -186,7 +187,7 @@ func (d *adapter) delete(q storage.Query, m Model) error {
 	if len(q.Conditions) == 1 && q.Conditions[0].Operator() == "=" && q.Conditions[0].Field() == pkName {
 		pkValue := q.Conditions[0].Value()
 		req := store.Call("delete", pkValue)
-		_, err = jsvalue.AwaitRequest(req)
+		_, err = await.Request(req)
 		return err
 	}
 
@@ -215,7 +216,7 @@ func (d *adapter) readOne(q storage.Query, m Model) error {
 	if len(q.Conditions) == 1 && q.Conditions[0].Operator() == "=" {
 		key := q.Conditions[0].Value()
 		req := store.Call("get", key)
-		result, err := jsvalue.AwaitRequest(req)
+		result, err := await.Request(req)
 		if err == nil && result.Truthy() {
 			return mapResult(result, m)
 		}

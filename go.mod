@@ -9,3 +9,5 @@ require (
 	github.com/tinywasm/model v0.1.4
 	github.com/tinywasm/storage v0.0.2
 )
+
+require github.com/tinywasm/await v0.1.0
