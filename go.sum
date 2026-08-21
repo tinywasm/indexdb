@@ -1,7 +1,7 @@
 github.com/tinywasm/await v0.1.0 h1:keCHZSRPohCGLv+Tm/ovZUwi9oZZX3G3QgUomsNgsxM=
 github.com/tinywasm/await v0.1.0/go.mod h1:7Z60wpqsTfOhy8zVE4kd86ZrFZ97e9Vx4E69Xwgeca8=
-github.com/tinywasm/fmt v0.25.6 h1:j6IDSoU9l+0GnYcx0pIa3Ckhg5j11mNPxTR9tQXU3sc=
-github.com/tinywasm/fmt v0.25.6/go.mod h1:2Y4hlsQxqVsZ5z9vQL5XQbEzLQtQOr1Bhp44nPGfydA=
+github.com/tinywasm/fmt v0.25.7 h1:Rju5B7LfrGu2QOA0L5IN0Cb9NwH5h8afGbawnF59Mec=
+github.com/tinywasm/fmt v0.25.7/go.mod h1:2Y4hlsQxqVsZ5z9vQL5XQbEzLQtQOr1Bhp44nPGfydA=
 github.com/tinywasm/jsvalue v0.0.17 h1:HtbpFrsehiV1Bs3u8wH8Y1s8XXD7ns/R7njRnGT7Sas=
 github.com/tinywasm/jsvalue v0.0.17/go.mod h1:Tq5eJXcAzr/H+Z5zsPR/cs1o/2ZrjxGTmGEedefmxok=
 github.com/tinywasm/model v0.1.4 h1:ZXz/LB9bUVzfiPO3R8iMDbZ6j2DCdR+rOV67zDaE7VE=
